@@ -17,10 +17,11 @@
 #include <QRegularExpression>
 
 
-CustomTabWidget::CustomTabWidget(QWidget *parent, ProjectManager *projectManager)
+CustomTabWidget::CustomTabWidget(QWidget *parent, ProjectManager *projectManager, PrisonerManager *prisonerManager)
     : QTabWidget(parent)
     , untitledCount(1)
     , projectManager(projectManager)
+    , prisonerManager(prisonerManager)
 {
     setupTabBar();
     setupTabWidget();
@@ -95,7 +96,7 @@ void CustomTabWidget::createNewTab(const QString &filePath,
     
     // Create a new tab with the file name as the tab text
     if (tabName.endsWith(".cell.txt") || (isUntitled && filePath.isEmpty())) {
-        newTab = new FictionViewTab(content, filePath, this, false, projectManager);
+        newTab = new FictionViewTab(content, filePath, this, false, projectManager, prisonerManager);
         connect(static_cast<FictionViewTab*>(newTab), &FictionViewTab::onChangeFileType,
                 this, &CustomTabWidget::updateFileType);
         connect(static_cast<FictionViewTab*>(newTab), &FictionViewTab::showWikiAt,
@@ -153,7 +154,7 @@ void CustomTabWidget::createFictionTab(const QString &filePath, bool isUntitled,
     }
     
     // Create a fiction view tab
-    newTab = new FictionViewTab(content, filePath, this, false, projectManager);
+    newTab = new FictionViewTab(content, filePath, this, false, projectManager, prisonerManager);
     connect(static_cast<BaseTextEditTab*>(newTab), &BaseTextEditTab::onChangeFileType,
         this, &CustomTabWidget::updateFileType);
     connect(static_cast<FictionViewTab*>(newTab), &FictionViewTab::showWikiAt,

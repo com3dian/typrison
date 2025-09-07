@@ -11,13 +11,14 @@
 #include <QPoint>
 
 #include "projectmanager.h"
+#include "prisonermanager.h"
 
 
 class CustomTabWidget : public QTabWidget {
     Q_OBJECT
 
 public:
-    CustomTabWidget(QWidget *parent = nullptr, ProjectManager *projectManager = nullptr);
+    CustomTabWidget(QWidget *parent = nullptr, ProjectManager *projectManager = nullptr, PrisonerManager *prisonerManager = nullptr);
 
     void createNewTab(const QString &filePath, bool isUntitled = false, int tabIndex = -1);
     void createFictionTab(const QString &filePath = "", bool isUntitled = true, int tabIndex = -1);
@@ -42,6 +43,7 @@ public slots:
 private:
     int untitledCount;
     ProjectManager *projectManager;
+    PrisonerManager *prisonerManager;
 
     void setupTabWidget();
     void setupTabBar();

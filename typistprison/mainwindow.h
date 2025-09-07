@@ -38,6 +38,7 @@
 #include "functionbar/menubutton.h"
 #include "qmarkdowntextedit.h"
 #include "progressborderwidget.h"
+#include "prisonermanager.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -88,6 +89,7 @@ private:
     QSplitter *centralSplitter;
     float previousSplitterPosition;
     ProjectManager *projectManager;
+    PrisonerManager *prisonerManager;
     QPushButton *sidePanelButton;
     QPushButton *button1;
     QPushButton *button2;

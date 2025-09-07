@@ -11,13 +11,15 @@ FictionViewTab::FictionViewTab(const QString &content,
                                const QString &filePath,
                                QWidget *parent,
                                bool isPrisoner,
-                               ProjectManager *projectManager)
+                               ProjectManager *projectManager,
+                               PrisonerManager *prisonerManager)
     : BaseTextEditTab(content, filePath, parent), 
       vScrollBar(new QScrollBar(Qt::Vertical, this)),
       wordCountSpacerRight(nullptr),
       oldTextContent(""),
       isPrisoner(isPrisoner),
-      projectManager(projectManager)
+      projectManager(projectManager),
+      prisonerManager(prisonerManager)
 {
     // Remove currentFilePath initialization as it's handled by BaseTextEditTab
     globalLayout = new QHBoxLayout(this);
@@ -81,15 +83,9 @@ FictionViewTab::FictionViewTab(const QString &content,
     sniperButton = new HoverButton("Sniper", this);
     sniperButton->setIcons(QIcon(":/icons/emptyicon.png"), QIcon(":/icons/sniper.png"));
     sniperButton->setLayoutDirection(Qt::RightToLeft);
-    if (isPrisoner) {
-        textEdit = new PrisonerFictionTextEdit(this, projectManager);
-
-        sniperButton->setVisible(false);
-    } else {
-        textEdit = new FictionTextEdit(this, projectManager);
-
-        sniperButton->setVisible(true);
-    }
+    
+    textEdit = new FictionTextEdit(this, projectManager, prisonerManager);
+    sniperButton->setVisible(true);
     
     topLeftLayout->addItem(topLeftSpacerLeft1);
     topLeftLayout->addItem(topLeftSpacerLeft2);
@@ -174,7 +170,7 @@ void FictionViewTab::setupTextEdit(const QString &content) {
         "   border: none;"
         "}"
         );
-    
+
     // Set initial minimum width, but we'll adjust this dynamically
     textEdit->setMinimumWidth(360); // minimum width
     textEdit->setMaximumWidth(960); // maximum width
@@ -308,21 +304,10 @@ void FictionViewTab::editContent() {
     emit onChangeTabName(QFileInfo(currentFilePath).fileName() + "*");
 }
 
-void FictionViewTab::updateWordcount() {
-    // if word count label is not visible, make it visible
-    if (!wordCountLabel->isVisible()) {
-        wordCountLabel->setVisible(true);
-    }
-    // prevent lagging in snipper mode
-    QString newTextContent = textEdit->toPlainText();
-    if (newTextContent == oldTextContent) {
-        return;
-    }
-
+int FictionViewTab::getBaseWordCount() {
     QString text = textEdit->toPlainText();
     if (text.isEmpty()) {
-        wordCountLabel->setText(QString::number(0) + " words  ");
-        return;
+        return 0;
     }
 
     int wordCount = 0;
@@ -344,12 +329,27 @@ void FictionViewTab::updateWordcount() {
         i.next();
         wordCount++;
     }
+
+    return wordCount;
+}
+
+void FictionViewTab::updateWordcount() {
+    // if word count label is not visible, make it visible
+    if (!wordCountLabel->isVisible()) {
+        wordCountLabel->setVisible(true);
+    }
+    // prevent lagging in snipper mode
+    QString newTextContent = textEdit->toPlainText();
+    if (newTextContent == oldTextContent) {
+        return;
+    }
+
+    int wordCount = this->getBaseWordCount();
     wordCountLabel->setText(QString::number(wordCount) + " words");
 
-    if (isPrisoner) {
+    if (isPrisoner && prisonerManager) {
         // update typist progress
-        
-
+        prisonerManager->updateTypingProgress(wordCount);
     }
 }
 
@@ -362,6 +362,7 @@ void FictionViewTab::activatePrisonerMode() {
     if (!saveContent()) {
         return;  // If save failed or was cancelled, don't proceed
     }
+    isPrisoner = true;
 
     int dialogWordGoal;
     int dialogTimeLimit;
@@ -371,7 +372,6 @@ void FictionViewTab::activatePrisonerMode() {
     connect(&dialog, &PrisonerDialog::prisonerSettings,
             this, [&](int wordGoal, int timeLimit) {
         // Handle the prisoner settings here
-        qDebug() << "Word Goal:" << wordGoal << "Time Limit:" << timeLimit;
 
         dialogWordGoal = wordGoal;
         dialogTimeLimit = timeLimit;
@@ -382,13 +382,24 @@ void FictionViewTab::activatePrisonerMode() {
         return;  // User cancelled the dialog
     }
 
+    // pass the word count to prisonermanager to start progress bar
+    int baseWordCount = this->getBaseWordCount();
+    if (prisonerManager) {
+        prisonerManager->setWordGoal(dialogWordGoal, baseWordCount);
+    }
+
     emit activatePrisonerModeSignal(dialogTimeLimit, dialogWordGoal);
 
     disconnect(prisonerButton, &QPushButton::clicked, this, &FictionViewTab::activatePrisonerMode);
     connect(prisonerButton, &QPushButton::clicked, this, &FictionViewTab::deactivatePrisonerMode);
 }
 
+/*
+deactivate the prisoner mode
+*/
 void FictionViewTab::deactivatePrisonerMode() {
+    isPrisoner = false;
+
     emit deactivatePrisonerModeSignal();
 
     connect(prisonerButton, &QPushButton::clicked, this, &FictionViewTab::activatePrisonerMode);

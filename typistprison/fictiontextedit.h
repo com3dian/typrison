@@ -7,6 +7,7 @@
 #include "projectmanager.h"
 #include "utils/fictionhighlighter.h"
 #include "utils/contextmenuutil.h"
+#include "prisonermanager.h"
 
 #include <QAbstractTextDocumentLayout>
 #include <QApplication>
@@ -38,7 +39,11 @@ class FictionTextEdit : public QTextEdit
     Q_OBJECT
 
 public:
-    FictionTextEdit(QWidget *parent = nullptr, ProjectManager *projectManager = nullptr);
+    FictionTextEdit(
+        QWidget *parent = nullptr,
+        ProjectManager *projectManager = nullptr,
+        PrisonerManager *prisonerManager = nullptr
+    );
 
     bool isSniperMode;
 
@@ -112,6 +117,7 @@ private:
     FictionHighlighter* highlighter;
     int matchStringIndex;
     ProjectManager *projectManager;
+    PrisonerManager *prisonerManager;
     QString previousText;
     int previousDocumentLength;
     int previousCursorPosition;

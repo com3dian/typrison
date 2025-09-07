@@ -36,6 +36,7 @@ MainWindow::MainWindow(QWidget *parent)
     , contextMenuFrame(nullptr)
     , subMenuFrame(nullptr)
     , splitterContainer(nullptr)
+    , prisonerManager(new PrisonerManager(this))
     , networkManager(new QNetworkAccessManager(this))
 {
     // Hide window original traffic lights (close, minimize, maximize buttons)
@@ -55,7 +56,7 @@ MainWindow::MainWindow(QWidget *parent)
     mainLayout->setSpacing(0);
 
     // Create a wrapper for the splitter (to ensure full expansion)
-    splitterContainer = new ProgressBorderWidget(mainContainer);
+    splitterContainer = new ProgressBorderWidget(mainContainer, prisonerManager);
     splitterContainer->setObjectName("splitterContainer");  // Add this line
     splitterContainer->setStyleSheet(
         "QWidget#splitterContainer {"  // Target only this specific widget
@@ -98,7 +99,7 @@ MainWindow::MainWindow(QWidget *parent)
     QVBoxLayout *editorLayout = new QVBoxLayout;
     editorLayout->setContentsMargins(0, 0, 0, 0); // Remove margins
     editorLayout->setSpacing(0); // Remove spacing
-    customTabWidget = new CustomTabWidget(this, projectManager);
+    customTabWidget = new CustomTabWidget(this, projectManager, prisonerManager);
 
     // Double holder for tab widget
     QWidget *customTabWidgetHolder = new QWidget(this);
@@ -1180,6 +1181,7 @@ void MainWindow::deactivatePrisonerModeFunc() {
     this->showNormal();
     splitterContainer->setFullScreen(false);
     splitterContainer->clearTimerProgress();
+    prisonerManager->clear();
 
     // Restore side panel
     if (projectManager->isLoadedProject) {

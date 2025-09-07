@@ -17,10 +17,10 @@
 #include <QMessageBox>
 #include <QRegularExpression>
 
-#include "prisonerfictiontextedit.h"
 #include "fictiontextedit.h"
 #include "searchWidget.h"
 #include "projectmanager.h"
+#include "prisonermanager.h"
 #include "basetextedittab.h"
 #include "utils/hoverbutton.h"
 #include "popups/prisonerdialog.h"
@@ -30,8 +30,12 @@ class FictionViewTab : public BaseTextEditTab {
     Q_OBJECT
 
 public:
-    explicit FictionViewTab(const QString &content, const QString &filePath, QWidget *parent = nullptr,
-                          bool isPrisoner = false, ProjectManager *projectManager = nullptr);
+    explicit FictionViewTab(const QString &content,
+                            const QString &filePath,
+                            QWidget *parent = nullptr,
+                            bool isPrisoner = false,
+                            ProjectManager *projectManager = nullptr,
+                            PrisonerManager *prisonerManager = nullptr);
     QString getTextContent() const override;
     HoverButton *prisonerButton;
 
@@ -49,6 +53,7 @@ private:
     QString oldTextContent;
     bool isPrisoner;
     ProjectManager *projectManager;
+    PrisonerManager *prisonerManager;
 
     void setupTextEdit(const QString &content);
     void setupScrollBar();
@@ -58,6 +63,7 @@ private:
     void editContent();
     bool saveContent() override;
     void updateWordcount();
+    int getBaseWordCount();
     void activatePrisonerMode();
     void deactivatePrisonerMode();
     void showWikiFunc(const QString &wikiContent, QPoint lastMousePos);

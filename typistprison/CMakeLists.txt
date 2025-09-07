@@ -27,8 +27,6 @@ set(PROJECT_SOURCES
     fictiontextedit.h
     fictionviewtab.cpp
     fictionviewtab.h
-    prisonerfictiontextedit.cpp
-    prisonerfictiontextedit.h
     plaintextedit.cpp
     plaintextedit.h
     plaintextviewtab.cpp
@@ -57,6 +55,8 @@ set(PROJECT_SOURCES
     customfilesystemmodel.h
     projectmanager.cpp
     projectmanager.h
+    prisonermanager.cpp
+    prisonermanager.h
     basetextedittab.cpp
     basetextedittab.h
     functionbar.cpp

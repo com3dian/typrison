@@ -1,7 +1,9 @@
 #include "fictiontextedit.h"
 #include "utils/contextmenuutil.h"
 
-FictionTextEdit::FictionTextEdit(QWidget *parent, ProjectManager *projectManager)
+FictionTextEdit::FictionTextEdit(QWidget *parent,
+                                 ProjectManager *projectManager,
+                                 PrisonerManager *prisonerManager)
     : QTextEdit(parent)
     , globalFontSize(14)
     , matchStringIndex(-1)
