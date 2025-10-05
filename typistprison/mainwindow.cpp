@@ -933,7 +933,6 @@ void MainWindow::displayImage(const QPixmap &pixmap, QPoint lastMousePos) {
         // Calculate the scaling factor to fit within max dimensions while maintaining aspect ratio
         QSize originalSize = pixmap.size();
         double scaleFactor = 0.2 + 0.8/((originalSize.width()+originalSize.height())/128+1);
-        qDebug() << "scaleFactor: " << scaleFactor;
         
         // Calculate scaled size
         QSize scaledSize = originalSize * scaleFactor;
@@ -1004,6 +1003,12 @@ void MainWindow::hideMarkdownImage() {
 
 /*
 Show wiki content in a popup frame.
+
+**** ** Harry Potter☚ **** ********
+                   +----------------+
+                   |   "The Boy Who |
+                   | Lived" ...     |
+                   +----------------+
 */
 void MainWindow::showWiki(const QString &wikiContent, QPoint lastMousePos) {
     // Create WikiFrame if it doesn't exist
@@ -1047,7 +1052,17 @@ void MainWindow::hideWiki() {
     }
 }
 
-// Add these methods to MainWindow class
+/*
+Show context window after right-click from file-tree-view side-bar on left
+
+folder
+- file☚+-----------+
+- file | Open      |
+       | Delete    |
+       | Rename    |
+       | Copy Path |
+       +-----------+
+*/
 void MainWindow::showContextMenu(const QStringList &options, const QModelIndex &index, bool isDir) {
     // Store the index and type for later use
     currentContextMenuIndex = index;

@@ -14,11 +14,19 @@ __
 #include <QWidget>
 #include <QPainter>
 #include <QRect>
+#include <QMouseEvent>
 
 class PaintCornerWidget : public QWidget {
     Q_OBJECT
+    
+private:
+    QColor m_backgroundColor;
+    bool isFullBlackMode;
+    bool isDragging;
+    QPoint dragStartPosition;
+    
 public:
-    explicit PaintCornerWidget(QWidget *parent = nullptr) : QWidget(parent) {
+    explicit PaintCornerWidget(QWidget *parent = nullptr) : QWidget(parent), isDragging(false) {
         // Set a fixed width (change 150 to your desired width)
         setFixedWidth(24);
     }
@@ -30,7 +38,7 @@ protected:
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing);
 
-        // You can add more custom painting code here
+        // Normal complex path drawing
         int slant = 2;  // Adjust this to control the slant amount
         int radius = 4;  // Corner radius
         int moveLeft = 3;
@@ -61,6 +69,40 @@ protected:
         painter.setPen(borderPen);
         painter.setBrush(Qt::NoBrush);
         painter.drawPath(path);
+    }
+    
+    // Mouse event handlers for window dragging
+    void mousePressEvent(QMouseEvent *event) override {
+        if (event->button() == Qt::LeftButton) {
+        #if QT_VERSION >= QT_VERSION_CHECK(5, 10, 0)
+                if (window()->windowHandle()) {
+                    window()->windowHandle()->startSystemMove();
+                }
+        #else
+                // fallback for old Qt versions
+                isDragging = true;
+                dragStartPosition = event->globalPos() - window()->frameGeometry().topLeft();
+        #endif
+                event->accept();
+        }
+    }
+    
+    void mouseMoveEvent(QMouseEvent *event) override {
+        #if QT_VERSION < QT_VERSION_CHECK(5, 10, 0)
+            if (isDragging && (event->buttons() & Qt::LeftButton)) {
+                window()->move(event->globalPos() - dragStartPosition);
+                event->accept();
+            }
+        #endif
+    }
+    
+    void mouseReleaseEvent(QMouseEvent *event) override {
+        #if QT_VERSION < QT_VERSION_CHECK(5, 10, 0)
+            if (event->button() == Qt::LeftButton) {
+                isDragging = false;
+                event->accept();
+            }
+        #endif
     }
 };
 

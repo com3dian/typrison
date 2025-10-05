@@ -127,8 +127,6 @@ QMarkdownTextEdit::QMarkdownTextEdit(QWidget *parent, bool initHighlighter)
     // Set up context menu
     this->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(this, &QMarkdownTextEdit::customContextMenuRequested, this, &QMarkdownTextEdit::showContextMenu);
-
-    // popup = new ImagePopup(this);
 }
 
 /**

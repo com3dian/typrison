@@ -77,14 +77,14 @@ set(PROJECT_SOURCES
     utils/fictionhighlighter.h
     utils/closebuttonwidget.cpp
     utils/closebuttonwidget.h
-    popups/imagepopup.cpp
-    popups/imagepopup.h
     popups/imageframe.h
     popups/wikiframe.h
     popups/wikiframe.cpp
     popups/savemessagebox.h
     popups/savemessagebox.cpp
     popups/prisonerdialog.h
+    popups/escapeprisonerdialog.h
+    popups/escapeprisonerdialog.cpp
     popups/utilsprisonerdialog.h
     popups/utilsprisonerdialog.cpp
     ${TS_FILES}

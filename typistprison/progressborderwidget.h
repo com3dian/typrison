@@ -34,6 +34,9 @@ private:
     qreal typingProgressLengthRatio;
     bool isTimerRunning;
     bool isFullScreen;
+    bool isPrisoner;
+    qreal startDistance;
+    qreal endDistance;
     PrisonerManager *prisonerManager;
 
     void drawPath(QPainter &painter, const QPainterPath &path, QColor color);

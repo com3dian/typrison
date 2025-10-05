@@ -6,7 +6,6 @@ PrisonerManager::PrisonerManager(QObject *parent)
       baseWordCount(0),
       timerProgressLength(0),
       greyWordCount(0) {
-
     }
 
 void PrisonerManager::setWordGoal(int wordGoal, int baseWordCount) {

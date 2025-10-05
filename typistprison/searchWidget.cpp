@@ -58,10 +58,12 @@ SearchWidget::SearchWidget(QWidget *parent)
     lineEdit->installEventFilter(this);
 
     connect(lineEdit, &QLineEdit::editingFinished, this, &SearchWidget::updateBottomLine);
+    connect(lineEdit, &QLineEdit::textChanged, this, &SearchWidget::updateBottomLine);
 }
 
 void SearchWidget::handleSearch(const QString &text)
 {
+    qDebug() << "handleSearch" << text;
     if (!text.isEmpty()) {
         emit onSearch(text);
 
@@ -156,8 +158,13 @@ bool SearchWidget::eventFilter(QObject *obj, QEvent *event)
 {
     if (obj == lineEdit) {
         if (event->type() == QEvent::FocusOut) {
+            qDebug() << "focus out";
+            // Force the cursor to stop blinking by clearing focus and resetting text
+            lineEdit->clearFocus();
+            lineEdit->setText("");  // Clear text temporarily
+            lineEdit->setCursorPosition(0);  // Position cursor at end
             updateBottomLine();
-            return true;  // Event handled
+            return false;  // Allow default focus handling to hide cursor
         }
 
         // Check if the event is a key event
@@ -179,13 +186,21 @@ bool SearchWidget::eventFilter(QObject *obj, QEvent *event)
                     return true;  // Event handled
 
                 } else if (keyEvent->key() == Qt::Key_Down && isOnSearch) {
+                    // same as above to prevent triggering `onSearch` signal twice
                     isSearchLatter = not isSearchLatter;
                     if (isSearchLatter) {
                         emit onSearch(searchText);
                         qDebug() << "on search down";
                     }
                     return true;  // Event handled
-                }
+                } 
+                // else {
+                //     // isSearchLatter = not isSearchLatter;
+                //     // if (isSearchLatter) {
+                //     //     emit onSearch(searchText);
+                //     //     qDebug() << "on search";
+                //     // }
+                // }
             }
         }
     } else if (obj == this) {
@@ -207,6 +222,7 @@ bool SearchWidget::eventFilter(QObject *obj, QEvent *event)
 void SearchWidget::updateBottomLine()
 {
     if (isOnSearch) {
+        qDebug() << "is on search";
         bottomLine->setStyleSheet("border: 1px solid #BDBDBD; border-radius: 4px;");
 
         searchButton->setStyleSheet(
@@ -224,6 +240,7 @@ void SearchWidget::updateBottomLine()
         searchButton->setFixedSize(16, 16);
     }
     else if (isHovered || !lineEdit->text().isEmpty() || lineEdit->hasFocus()) {
+        qDebug() << lineEdit->text();
         bottomLine->setStyleSheet("border: 1px solid #BDBDBD; border-radius: 4px;");
 
         searchButton->setStyleSheet(
@@ -240,6 +257,7 @@ void SearchWidget::updateBottomLine()
         );
         searchButton->setFixedSize(16, 16);
     } else {
+        qDebug() << "is not on search";
         searchButton->setStyleSheet(
             "QPushButton {"
             "border: none;"
@@ -258,5 +276,6 @@ void SearchWidget::loseAttention()
     }
     lineEdit->setText("+");
     lineEdit->clear();
+    this->updateBottomLine();
     lineEdit->clearFocus();
 }

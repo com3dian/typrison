@@ -7,8 +7,7 @@ FunctionBar::FunctionBar(QWidget *parent, CustomTabWidget *syncedTabWidget)
     : QWidget(parent)
     , syncedTabWidget(syncedTabWidget)
     , isExpanded(false)
-    , isDragging(false)  // Add this initialization
-    // Add paintCornerWidgetOpacityEffect to initializer list if you prefer, or assign in body
+    , isDragging(false)
 {
     // Main container layout
     mainLayout = new QHBoxLayout(this);
@@ -39,10 +38,6 @@ FunctionBar::FunctionBar(QWidget *parent, CustomTabWidget *syncedTabWidget)
     paintCornerWidget = new PaintCornerWidget(this);
     paintCornerWidget->setVisible(false); // Start hidden
 
-    transparentRightWidget = new QWidget(this);
-    transparentRightWidget->setAttribute(Qt::WA_TranslucentBackground), transparentRightWidget->setFixedWidth(24);
-    transparentRightWidget->setVisible(false);
-
     TrafficLightWidget *trafficLightWidget = new TrafficLightWidget(this);
     connect(trafficLightWidget, &TrafficLightWidget::minimalButtonClicked, this, &FunctionBar::minimalButtonClicked);
     connect(trafficLightWidget, &TrafficLightWidget::maximalButtonClicked, this, &FunctionBar::maximalButtonClicked);
@@ -57,7 +52,6 @@ FunctionBar::FunctionBar(QWidget *parent, CustomTabWidget *syncedTabWidget)
     mainLayout->addWidget(paintLeftEdgeWidget);
     mainLayout->addWidget(tabBar);             // Tab bar on the right
     mainLayout->addWidget(paintCornerWidget);  // corner painting for last tab
-    mainLayout->addWidget(transparentRightWidget);
     mainLayout->addItem(spacer);
     mainLayout->addWidget(trafficLightWidget);
 
@@ -216,7 +210,6 @@ void FunctionBar::setupTabBar() {
         this, &FunctionBar::notHideBothPaintCornerWidget,
         Qt::UniqueConnection);
 
-
     return;
 }
 
@@ -350,10 +343,7 @@ void FunctionBar::showPaintCornerWidget() {
     if (isScrollbuttonActive) {
         return;
     }
-
-    // Ensure widget is visible, and set initial opacity if it was hidden
     paintCornerWidget->setVisible(true);
-    transparentRightWidget->setVisible(false);
 }
 
 void FunctionBar::hidePaintCornerWidget() {
@@ -362,7 +352,6 @@ void FunctionBar::hidePaintCornerWidget() {
     }
 
     paintCornerWidget->setVisible(false);
-    transparentRightWidget->setVisible(true);
 }
 
 void FunctionBar::animatePaintRightEdgeWidget() {
@@ -400,7 +389,6 @@ void FunctionBar::hidePaintLeftEdgeWidget() {
 
 void FunctionBar::hideBothPaintCornerWidget() {
     paintCornerWidget->setVisible(false);
-    transparentRightWidget->setVisible(false);
 
     isScrollbuttonActive = true;
 }

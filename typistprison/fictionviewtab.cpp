@@ -398,12 +398,21 @@ void FictionViewTab::activatePrisonerMode() {
 deactivate the prisoner mode
 */
 void FictionViewTab::deactivatePrisonerMode() {
-    isPrisoner = false;
-
-    emit deactivatePrisonerModeSignal();
-
-    connect(prisonerButton, &QPushButton::clicked, this, &FictionViewTab::activatePrisonerMode);
-    disconnect(prisonerButton, &QPushButton::clicked, this, &FictionViewTab::deactivatePrisonerMode);
+    // Show escape confirmation dialog
+    EscapePrisonerDialog *escapeDialog = new EscapePrisonerDialog(this);
+    
+    int result = escapeDialog->exec();
+    
+    if (result == QDialog::Accepted && escapeDialog->getResult() == EscapePrisonerDialog::Escape) {
+        // User confirmed escape
+        isPrisoner = false;
+        emit deactivatePrisonerModeSignal();
+        connect(prisonerButton, &QPushButton::clicked, this, &FictionViewTab::activatePrisonerMode);
+        disconnect(prisonerButton, &QPushButton::clicked, this, &FictionViewTab::deactivatePrisonerMode);
+    }
+    // If rejected or "Stay Focused" was clicked, do nothing (stay in prisoner mode)
+    
+    escapeDialog->deleteLater();
 }
 
 QString FictionViewTab::getTextContent() const {

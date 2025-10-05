@@ -24,6 +24,7 @@
 #include "basetextedittab.h"
 #include "utils/hoverbutton.h"
 #include "popups/prisonerdialog.h"
+#include "popups/escapeprisonerdialog.h"
 
 
 class FictionViewTab : public BaseTextEditTab {

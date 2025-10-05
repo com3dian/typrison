@@ -54,7 +54,6 @@ private:
     QGraphicsOpacityEffect *paintCornerWidgetOpacityEffect;
     PaintLeftEdgeWidget *paintLeftEdgeWidget;
     QWidget *transparentLeftWidget;
-    QWidget *transparentRightWidget;
 
     QSpacerItem *fixedSpacer1;
     QSpacerItem *fixedSpacer2;
