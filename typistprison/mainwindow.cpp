@@ -38,6 +38,8 @@ MainWindow::MainWindow(QWidget *parent)
     , splitterContainer(nullptr)
     , prisonerManager(new PrisonerManager(this))
     , networkManager(new QNetworkAccessManager(this))
+    , pendingTimeLimit(0)
+    , pendingWordGoal(0)
 {
     // Hide window original traffic lights (close, minimize, maximize buttons)
     this->setWindowFlags(Qt::FramelessWindowHint);
@@ -164,6 +166,16 @@ MainWindow::MainWindow(QWidget *parent)
     sidePanelButton->raise(); // Bring to front
     sidePanelButton->setVisible(false);
 
+    // ---- Create the Floating countdown timer widget ----
+    countdownTimerWidget = new CountdownTimerWidget(this);
+    countdownTimerWidget->raise(); // Bring to front
+    countdownTimerWidget->setVisible(false);
+    
+    // Connect countdown finished signal to activate prisoner mode
+    connect(countdownTimerWidget, &CountdownTimerWidget::countdownFinished, this, [this]() {
+        splitterContainer->activatePrisonerMode(pendingTimeLimit, pendingWordGoal);
+    });
+
     // Move the button to the bottom-left corner dynamically
     adjustButtonPosition();
 
@@ -266,6 +278,7 @@ void MainWindow::createAndOpenProject()
 void MainWindow::resizeEvent(QResizeEvent *event) {
     QMainWindow::resizeEvent(event);
     adjustButtonPosition();
+    adjustCountdownTimerPosition();
 }
 
 // ---- Adjust the Button's Position Based on Window Size ----
@@ -274,6 +287,13 @@ void MainWindow::adjustButtonPosition() {
     int buttonX = margin; 
     int buttonY = height() - sidePanelButton->height() - margin; // Bottom left corner
     sidePanelButton->move(buttonX, buttonY);
+}
+
+void MainWindow::adjustCountdownTimerPosition() {
+    int margin = 0; // Adjust margin for spacing
+    int countdownTimerX = margin;
+    int countdownTimerY = margin; // Top left corner
+    countdownTimerWidget->move(countdownTimerX, countdownTimerY);
 }
 
 MainWindow::~MainWindow()
@@ -576,6 +596,21 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
         }
     }
     return QWidget::eventFilter(obj, event);
+}
+
+void MainWindow::changeEvent(QEvent *event) {
+    qDebug() << "changeEvent";
+    if (event->type() == QEvent::ActivationChange) {
+        if (!this->isActiveWindow()) {
+            QWidget *current = customTabWidget ? customTabWidget->currentWidget() : nullptr;
+            auto *fictionTab = qobject_cast<FictionViewTab *>(current);
+            if (fictionTab && fictionTab->isInPrisonerMode() && !fictionTab->isDeactivationEscapeBlocked() && fictionTab->prisonerButton) {
+                qDebug() << "click prisoner button";
+                fictionTab->prisonerButton->click();
+            }
+        }
+    }
+    QMainWindow::changeEvent(event);
 }
 
 /*
@@ -1169,6 +1204,17 @@ void MainWindow::closeFileTreeView() {
 }
 
 void MainWindow::activatePrisonerModeFunc(int timeLimit, int wordGoal) {
+    // Store the parameters for when countdown finishes
+    int countdownTimeLimit = -1;
+
+    if (timeLimit == -1) {
+        pendingTimeLimit = -1;
+    } else {
+        countdownTimeLimit = qBound(1, timeLimit * 5 / 100, 5);
+        pendingTimeLimit = timeLimit - countdownTimeLimit;
+    }
+    pendingWordGoal = wordGoal;
+    
     // Close side panel
     closeFileTreeView();
     
@@ -1185,23 +1231,36 @@ void MainWindow::activatePrisonerModeFunc(int timeLimit, int wordGoal) {
     // make the window maximum
     this->showFullScreen();
     splitterContainer->setFullScreen(true);
-    splitterContainer->startTimerProgress(timeLimit, wordGoal);
+    
+    // Set progress border widget to prisoner mode for visual progress bar
+    splitterContainer->setPrisonerModeForProgress(true);
+    splitterContainer->setTargetWordCount(pendingWordGoal);
+    
+    // Don't activate prisoner mode immediately - wait for countdown to finish
+    // start the countdown timer
+    countdownTimerWidget->startCountdown(60 * countdownTimeLimit);
+    countdownTimerWidget->showWidget();
+    adjustCountdownTimerPosition();
 }
 
 void MainWindow::deactivatePrisonerModeFunc() {
     // Show customtabbar
     functionBar->setVisible(true);
 
-    // First ensure window is not maximized
+    // first stop the countdown timer
+    countdownTimerWidget->stopCountdown();
+    countdownTimerWidget->hideWidget();
+
+    // then ensure window is not maximized
     this->showNormal();
     splitterContainer->setFullScreen(false);
-    splitterContainer->clearTimerProgress();
-    prisonerManager->clear();
+    splitterContainer->setPrisonerModeForProgress(false);
+    splitterContainer->deactivatePrisonerMode();
+    prisonerManager->clear();  
 
-    // Restore side panel
+    // restore side panel
     if (projectManager->isLoadedProject) {
-        // openFileTreeView();
-        // Show side panel button
+        // show side panel button
         sidePanelButton->setVisible(true);
     }
     
@@ -1211,11 +1270,15 @@ void MainWindow::deactivatePrisonerModeFunc() {
 }
 
 /*
-cursor behavior near edges of window
+define cursor behavior near edges of window
 
-resizing window in linux
+needed for resizing window in linux
+
+----------------+
+               <|>
+                |
+                |
 */
-
 Qt::Edges MainWindow::edgeAt(const QPoint &pos) const {
         Qt::Edges edges;
         QRect r = rect();

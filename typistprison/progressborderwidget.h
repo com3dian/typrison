@@ -12,9 +12,13 @@ class ProgressBorderWidget : public QWidget {
 
 public:
     explicit ProgressBorderWidget(QWidget *parent = nullptr, PrisonerManager *prisonerManager = nullptr);
+    void activatePrisonerMode(int timeLimit, int wordGoal);
+    void deactivatePrisonerMode();
     void startTimerProgress(int timeLimit, int wordGoal);
     void clearTimerProgress();
     void setFullScreen(bool fullScreen);
+    void setPrisonerModeForProgress(bool isPrisoner);
+    void setTargetWordCount(int wordGoal);
 
 signals:
     void needsRepaint();
@@ -25,7 +29,7 @@ protected:
 private slots:
     void updateTimerProgress();
     void updateTypingProgress(int wordCount);
-
+    void clearTypingProgress();
 private:
     QTimer *prisonerTimer;
     qreal timerProgress;

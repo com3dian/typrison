@@ -39,6 +39,7 @@
 #include "qmarkdowntextedit.h"
 #include "progressborderwidget.h"
 #include "prisonermanager.h"
+#include "countdowntimerwidget.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -107,7 +108,12 @@ private:
     QVBoxLayout *splitterLayout;
     QWidget *splitterTopWidget;
     QNetworkAccessManager *networkManager;
-
+    CountdownTimerWidget *countdownTimerWidget;
+    
+    // Member variables to store prisoner mode parameters for countdown
+    int pendingTimeLimit;
+    int pendingWordGoal;
+    
     void setupUntitledTab(TabType tabType = FICTION_TAB);
     void setupMenuButtons(FunctionBar *tabBarWidget);
     void createNewTab(const QString &tabName);
@@ -118,6 +124,7 @@ private:
     void closeWindow();
     void resizeEvent(QResizeEvent *event) override;
     void adjustButtonPosition();
+    void adjustCountdownTimerPosition();
     void handleMouseEnterMenuButton(QPushButton *button);
     void handleFocusLeaveMenuButton();
     void setupActions();
@@ -125,6 +132,7 @@ private:
 
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override;
+    void changeEvent(QEvent *event) override;
     Qt::Edges edgeAt(const QPoint &pos) const;
     void updateCursor(const Qt::Edges &edges);
     void mousePressEvent(QMouseEvent *event) override;

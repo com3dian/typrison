@@ -19,7 +19,8 @@ FictionViewTab::FictionViewTab(const QString &content,
       oldTextContent(""),
       isPrisoner(isPrisoner),
       projectManager(projectManager),
-      prisonerManager(prisonerManager)
+      prisonerManager(prisonerManager),
+      prisonerInitialContent("")
 {
     // Remove currentFilePath initialization as it's handled by BaseTextEditTab
     globalLayout = new QHBoxLayout(this);
@@ -392,31 +393,103 @@ void FictionViewTab::activatePrisonerMode() {
 
     disconnect(prisonerButton, &QPushButton::clicked, this, &FictionViewTab::activatePrisonerMode);
     connect(prisonerButton, &QPushButton::clicked, this, &FictionViewTab::deactivatePrisonerMode);
+
+    // get all text edit content
+    prisonerInitialContent = textEdit->toPlainText();
+
+    connect(prisonerManager,
+            &PrisonerManager::prisonerModeFailed,
+            this,
+            &FictionViewTab::failedPrisonerMode);
 }
 
 /*
-deactivate the prisoner mode
+deactivate the prisoner mode by popup a dialog to confirm user want to escape
+triggered when user click prisoner button
 */
 void FictionViewTab::deactivatePrisonerMode() {
+    // Prevent multiple dialogs
+    if (activeEscapeDialog) {
+        return;
+    }
+
     // Show escape confirmation dialog
-    EscapePrisonerDialog *escapeDialog = new EscapePrisonerDialog(this);
+    blockDeactivationEscape = true;
+    activeEscapeDialog = new EscapePrisonerDialog(this);
+    connect(activeEscapeDialog, &QObject::destroyed, this, [this]() {
+        activeEscapeDialog = nullptr;
+        blockDeactivationEscape = false;
+    });
     
-    int result = escapeDialog->exec();
+    int result = activeEscapeDialog->exec();
     
-    if (result == QDialog::Accepted && escapeDialog->getResult() == EscapePrisonerDialog::Escape) {
-        // User confirmed escape
-        isPrisoner = false;
-        emit deactivatePrisonerModeSignal();
-        connect(prisonerButton, &QPushButton::clicked, this, &FictionViewTab::activatePrisonerMode);
-        disconnect(prisonerButton, &QPushButton::clicked, this, &FictionViewTab::deactivatePrisonerMode);
+    if (result == QDialog::Accepted && activeEscapeDialog->getResult() == EscapePrisonerDialog::Escape) {
+        this->escapePrisonerMode();
     }
     // If rejected or "Stay Focused" was clicked, do nothing (stay in prisoner mode)
     
-    escapeDialog->deleteLater();
+    activeEscapeDialog->deleteLater();
+    disconnect(prisonerManager,
+            &PrisonerManager::prisonerModeFailed,
+            this,
+            &FictionViewTab::deactivatePrisonerMode);
+}
+
+void FictionViewTab::failedPrisonerMode() {
+    // Block deactivation-triggered escape while showing failure dialog
+    blockDeactivationEscape = true;
+    // Show failed prisoner mode dialog
+    FailedPrisonerDialog *failedDialog = new FailedPrisonerDialog(this);
+    
+    // Connect the dialog closed signal to trigger escape
+    connect(failedDialog, &FailedPrisonerDialog::dialogClosed, this, [this]() {
+        this->escapePrisonerMode();
+    });
+    
+    int result = failedDialog->exec();
+    
+    // Always proceed with escape since this is a failure, not a choice
+    // Handle both Accepted and Rejected cases
+    if (result == QDialog::Accepted || result == QDialog::Rejected) {
+        this->escapePrisonerMode();
+    }
+    
+    failedDialog->deleteLater();
+    blockDeactivationEscape = false;
+    disconnect(prisonerManager,
+            &PrisonerManager::prisonerModeFailed,
+            this,
+            &FictionViewTab::failedPrisonerMode);
+}
+
+/*
+escape the prisoner mode
+*/
+void FictionViewTab::escapePrisonerMode() {
+    // User confirmed escape
+    isPrisoner = false;
+    emit deactivatePrisonerModeSignal();
+    connect(prisonerButton, &QPushButton::clicked, this, &FictionViewTab::activatePrisonerMode);
+    disconnect(prisonerButton, &QPushButton::clicked, this, &FictionViewTab::deactivatePrisonerMode);
+
+    if (prisonerManager) {
+        // if goal not reached, clear the progress in prisoner mode
+        if (!prisonerManager->isGoalReached()) {
+            textEdit->load(prisonerInitialContent);
+        }
+    }
 }
 
 QString FictionViewTab::getTextContent() const {
     return textEdit->toPlainText();
+}
+
+bool FictionViewTab::isInPrisonerMode() const {
+    return isPrisoner;
+}
+
+bool FictionViewTab::isDeactivationEscapeBlocked() const {
+    return blockDeactivationEscape;
 }
 
 void FictionViewTab::resizeEvent(QResizeEvent *event) {
@@ -431,9 +504,6 @@ void FictionViewTab::resizeEvent(QResizeEvent *event) {
 }
 
 void FictionViewTab::showWikiFunc(const QString &wikiContent, QPoint lastMousePos) {
-    if (isPrisoner) {
-        qDebug() << "showWikiFunc: prisoner mode";
-    }
     emit showWikiAt(wikiContent, lastMousePos);
 }
 

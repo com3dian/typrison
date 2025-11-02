@@ -11,6 +11,13 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Fix for macOS - prevent linking obsolete AGL framework
+if(APPLE)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15" CACHE STRING "Minimum OS X deployment version")
+    # Disable AGL framework lookup (it's obsolete and removed from modern macOS)
+    set(WrapOpenGL_AGL "" CACHE FILEPATH "Disable AGL framework" FORCE)
+endif()
+
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core Gui Widgets Network Concurrent LinguistTools)
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Gui Widgets Network Concurrent LinguistTools)
 
@@ -23,6 +30,8 @@ set(PROJECT_SOURCES
     mainwindow.ui
     progressborderwidget.cpp
     progressborderwidget.h
+    countdowntimerwidget.cpp
+    countdowntimerwidget.h
     fictiontextedit.cpp
     fictiontextedit.h
     fictionviewtab.cpp
@@ -85,6 +94,8 @@ set(PROJECT_SOURCES
     popups/prisonerdialog.h
     popups/escapeprisonerdialog.h
     popups/escapeprisonerdialog.cpp
+    popups/failedprisonerdialog.h
+    popups/failedprisonerdialog.cpp
     popups/utilsprisonerdialog.h
     popups/utilsprisonerdialog.cpp
     ${TS_FILES}
@@ -129,6 +140,7 @@ target_link_libraries(typistprison PRIVATE
     Qt${QT_VERSION_MAJOR}::Network
     Qt${QT_VERSION_MAJOR}::Concurrent
 )
+
 
 # Set properties for the executable
 set_target_properties(typistprison PROPERTIES

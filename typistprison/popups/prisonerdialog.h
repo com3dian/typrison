@@ -242,6 +242,49 @@ public:
         // Update label dynamically
         connect(slider, &QSlider::valueChanged, this, [=](int value) {
             double ratio = value / 100.0;  // Convert to ratio between 0 and 1
+            if (ratio <= 0.0) {
+                actionButton->setEnabled(false);
+                actionButton->setIcons(QIcon(":/icons/empty_icon.png"), QIcon(":/icons/empty_icon.png"));
+                actionButton->setSilentBehavior(R"(
+                        QPushButton {
+                            background-color: transparent;
+                            border: 1px solid #333333;
+                            color: #5A5A5A;
+                            border-radius: 4px;
+                            padding: 4px 8px;
+                        }
+                    )");
+                actionButton->setHoverBehavior(R"(
+                    QPushButton {
+                        background-color: transparent;
+                        border: 1px solid #333333;
+                        color: #5A5A5A;
+                        border-radius: 4px;
+                        padding: 4px 8px;
+                    }
+                )");
+            } else {
+                actionButton->setEnabled(true);
+                actionButton->setIcons(QIcon(":/icons/right_arrow.png"), QIcon(":/icons/right_arrow_hover.png"));
+                actionButton->setSilentBehavior(R"(
+                    QPushButton {
+                        background-color: transparent;
+                        border: 1px solid #5A5A5A;
+                        color: #BDBDBD;
+                        border-radius: 4px;
+                        padding: 4px 8px;
+                    }
+                )");
+                actionButton->setHoverBehavior(R"(
+                    QPushButton {
+                        background-color: transparent;
+                        border: 1px solid #999999;
+                        color: #DEDEDE;
+                        border-radius: 4px;
+                        padding: 4px 8px;
+                    }
+                )");
+            }
             if (ratio == 1.0) {
                 sliderValueLabel->setText(QString("<span style='font-size: 24px; color: white;'>%1</span>")
                                   .arg("Unlimited"));

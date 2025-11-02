@@ -25,6 +25,7 @@
 #include "utils/hoverbutton.h"
 #include "popups/prisonerdialog.h"
 #include "popups/escapeprisonerdialog.h"
+#include "popups/failedprisonerdialog.h"
 
 
 class FictionViewTab : public BaseTextEditTab {
@@ -39,6 +40,8 @@ public:
                             PrisonerManager *prisonerManager = nullptr);
     QString getTextContent() const override;
     HoverButton *prisonerButton;
+    bool isInPrisonerMode() const;
+    bool isDeactivationEscapeBlocked() const;
 
 private:
     FictionTextEdit *textEdit;
@@ -55,6 +58,9 @@ private:
     bool isPrisoner;
     ProjectManager *projectManager;
     PrisonerManager *prisonerManager;
+    QString prisonerInitialContent;
+    EscapePrisonerDialog *activeEscapeDialog = nullptr;
+    bool blockDeactivationEscape = false;
 
     void setupTextEdit(const QString &content);
     void setupScrollBar();
@@ -67,6 +73,8 @@ private:
     int getBaseWordCount();
     void activatePrisonerMode();
     void deactivatePrisonerMode();
+    void failedPrisonerMode();
+    void escapePrisonerMode();
     void showWikiFunc(const QString &wikiContent, QPoint lastMousePos);
     void hideWikiFunc();
 

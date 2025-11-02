@@ -16,11 +16,40 @@ ProgressBorderWidget::ProgressBorderWidget(QWidget *parent, PrisonerManager *pri
             &ProgressBorderWidget::updateTimerProgress);
 
     if (prisonerManager) {
+        // update the typ b ing progress in the progress border widget
         connect(prisonerManager,
         &PrisonerManager::updateTypingProgressInProgressBorder,
         this,
         &ProgressBorderWidget::updateTypingProgress);
+        
+        // if prisoner mode failed, deactivate the prisoner mode
+        connect(prisonerManager,
+        &PrisonerManager::prisonerModeFailed,
+        this,
+        &ProgressBorderWidget::deactivatePrisonerMode);
     }
+}
+
+/*
+activate the prisoner mode
+
+get full screen; start timer progress
+*/
+
+void ProgressBorderWidget::activatePrisonerMode(int timeLimit, int wordGoal) {
+    isPrisoner = true;
+
+    this->startTimerProgress(timeLimit, wordGoal);
+    update(); // Update to show current typing progress
+    repaint();
+}
+
+void ProgressBorderWidget::deactivatePrisonerMode() {
+    isPrisoner = false;
+
+    this->clearTimerProgress();
+    this->clearTypingProgress();
+    repaint();
 }
 
 void ProgressBorderWidget::startTimerProgress(int timeLimit, int wordGoal) {
@@ -38,6 +67,7 @@ void ProgressBorderWidget::clearTimerProgress() {
     update(); // repaint
     emit needsRepaint();
     isTimerRunning = false;
+    isPrisoner = false;
 }
 
 void ProgressBorderWidget::updateTimerProgress() {
@@ -57,6 +87,16 @@ void ProgressBorderWidget::updateTypingProgress(int wordCount) {
     } else {
         typingProgressLengthRatio = 0.0;
     }
+    
+    // Only update visual progress if prisoner mode is actually active
+    if (isPrisoner) {
+        update();
+        emit needsRepaint();
+    }
+}
+
+void ProgressBorderWidget::clearTypingProgress() {
+    typingProgressLengthRatio = 0.0;
     update();
     emit needsRepaint();
 }
@@ -90,8 +130,8 @@ void ProgressBorderWidget::paintBorder(QPainter &painter,
     QPointF bottomLeftArcFrom = rect.bottomLeft() + QPointF(2 * borderMargin + innerRadius, -borderMargin);
     QPointF bottomLeftArcTo = rect.bottomLeft() + QPointF(borderMargin, - 2 * borderMargin - innerRadius);
 
-    startDistance = 40;
-    endDistance = 40;
+    startDistance = 120;
+    endDistance = 60;
     QPointF startPoint = topLeftArcTo + QPointF(startDistance, 0);
     QPointF endPoint = topLeftArcFrom + QPointF(0, endDistance);
     QPainterPath path;
@@ -318,4 +358,14 @@ void ProgressBorderWidget::setFullScreen(bool fullScreen) {
     isFullScreen = fullScreen;
     update();
     emit needsRepaint();
+}
+
+void ProgressBorderWidget::setPrisonerModeForProgress(bool isPrisoner) {
+    this->isPrisoner = isPrisoner;
+    update();
+    emit needsRepaint();
+}
+
+void ProgressBorderWidget::setTargetWordCount(int wordGoal) {
+    this->targetWordCount = wordGoal;
 }

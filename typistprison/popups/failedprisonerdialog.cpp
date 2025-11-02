@@ -1,4 +1,4 @@
-#include "escapeprisonerdialog.h"
+#include "failedprisonerdialog.h"
 #include <QApplication>
 #include <QDebug>
 #include <QScreen>
@@ -8,11 +8,11 @@
 #include <QWidget>
 #include "../utils/hoverbutton.h"
 
-EscapePrisonerDialog::EscapePrisonerDialog(QWidget *parent)
+FailedPrisonerDialog::FailedPrisonerDialog(QWidget *parent)
     : QDialog(parent)
 {
     // Set the dialog parameters
-    setWindowTitle("Escape Prisoner Mode");
+    setWindowTitle("Prisoner Mode Failed");
     setModal(true);
     setMinimumSize(400, 250);
     resize(400, 300);
@@ -49,7 +49,7 @@ EscapePrisonerDialog::EscapePrisonerDialog(QWidget *parent)
     topLayout->addWidget(closeButtonWidget);
     mainLayout->addLayout(topLayout);
 
-    // Door Icon
+    // Prisoner Icon (using the same escape icon for consistency)
     QLabel *iconLabel = new QLabel(this);
     // Calculate size based on device pixel ratio
     qreal dpr = devicePixelRatio();
@@ -61,6 +61,7 @@ EscapePrisonerDialog::EscapePrisonerDialog(QWidget *parent)
     // Scale the pixmap at a higher resolution
     QPixmap scaledPixmap = iconPixmap.scaled(scaledWidth, scaledHeight, 
         Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    
     // Set the device pixel ratio
     scaledPixmap.setDevicePixelRatio(dpr);
     iconLabel->setPixmap(scaledPixmap);
@@ -75,14 +76,14 @@ EscapePrisonerDialog::EscapePrisonerDialog(QWidget *parent)
     mainLayout->addLayout(iconLayout);
 
     // Title text below icon
-    QLabel *titleLabel = new QLabel("Escape", this);
+    QLabel *titleLabel = new QLabel("Failed", this);
     titleLabel->setStyleSheet("color: white; font-size: 24px; background: transparent;");
     titleLabel->setAlignment(Qt::AlignCenter);
     mainLayout->addWidget(titleLabel);
     mainLayout->addSpacing(16);
 
     // Create and add the message label
-    QLabel *messageLabel = new QLabel("After abandoning, all writing records in prisoner mode will be cleared, and your writing progress will be restored to the state before entering the challenge.", this);
+    QLabel *messageLabel = new QLabel("You failed to maintain the required typing pace. Your writing progress has been restored to the state before entering the challenge.", this);
     messageLabel->setWordWrap(true);
     messageLabel->setAlignment(Qt::AlignLeft);
     messageLabel->setStyleSheet("QLabel { color: #BDBDBD; background: transparent; border: none; }");
@@ -95,46 +96,31 @@ EscapePrisonerDialog::EscapePrisonerDialog(QWidget *parent)
     QHBoxLayout *buttonLayout = new QHBoxLayout();
     buttonLayout->setSpacing(10);
 
-    // Create custom buttons
-    stayButton = new HoverButton("Stay Focused ", container);
-    escapeButton = new HoverButton("Escape ", container);
+    // Create custom button
+    acknowledgeButton = new HoverButton("All right", container);
 
-    // Style the buttons using the proper HoverButton methods
-    stayButton->setIcons(
+    // Style the button using the proper HoverButton methods
+    acknowledgeButton->setIcons(
         QIcon(":/icons/right_arrow.png"),
-        QIcon(":/icons/right_arrow_green.png")
+        QIcon(":/icons/right_arrow_hover.png")
     );
-    stayButton->setSilentBehavior(
+    acknowledgeButton->setSilentBehavior(
         "background-color: transparent; border: 1px solid #5A5A5A; color: #BDBDBD; border-radius: 4px; padding: 4px 8px;"
     );
-    stayButton->setHoverBehavior(
-        "background-color: transparent; border: 1px solid #80bd96; color: #84e0a5; border-radius: 4px; padding: 4px 8px;"
+    acknowledgeButton->setHoverBehavior(
+        "background-color: transparent; border: 1px solid #999999; color: #DEDEDE; border-radius: 4px; padding: 4px 8px;"
     );
-    stayButton->setLayoutDirection(Qt::RightToLeft);
-
-    escapeButton->setIcons(
-        QIcon(":/icons/discard_file.png"),
-        QIcon(":/icons/discard_file_hover.png")
-    );
-    escapeButton->setSilentBehavior(
-        "background-color: transparent; border: 1px solid #5A5A5A; color: #BDBDBD; border-radius: 4px; padding: 4px 8px;"
-    );
-    escapeButton->setHoverBehavior(
-        "background-color: transparent; border: 1px solid #BA6757; color: #E0715C; border-radius: 4px; padding: 4px 8px;"
-    );
-    escapeButton->setLayoutDirection(Qt::RightToLeft);
+    acknowledgeButton->setLayoutDirection(Qt::RightToLeft);
     
-    // Add buttons to layout with explicit positioning
-    buttonLayout->addStretch(); // Push buttons
-    buttonLayout->addWidget(escapeButton);
-    buttonLayout->addWidget(stayButton);
+    // Add button to layout with explicit positioning
+    buttonLayout->addStretch(); // Push button to the right
+    buttonLayout->addWidget(acknowledgeButton);
 
     // Add button layout to main layout
     mainLayout->addLayout(buttonLayout);
 
-    // Connect the custom buttons to the appropriate slots
-    connect(stayButton, &QPushButton::clicked, this, &EscapePrisonerDialog::onStayClicked);
-    connect(escapeButton, &QPushButton::clicked, this, &EscapePrisonerDialog::onEscapeClicked);
+    // Connect the custom button to the appropriate slot
+    connect(acknowledgeButton, &QPushButton::clicked, this, &FailedPrisonerDialog::onAcknowledgeClicked);
 
     // Create a layout for the dialog itself
     QVBoxLayout *dialogLayout = new QVBoxLayout(this);
@@ -145,17 +131,18 @@ EscapePrisonerDialog::EscapePrisonerDialog(QWidget *parent)
     centerOnScreen();
 }
 
-void EscapePrisonerDialog::onStayClicked() {
-    result = Stay;
+void FailedPrisonerDialog::onAcknowledgeClicked() {
     accept();
 }
 
-void EscapePrisonerDialog::onEscapeClicked() {
-    result = Escape;
-    accept();
+void FailedPrisonerDialog::closeEvent(QCloseEvent *event) {
+    qDebug() << "FailedPrisonerDialog closed";
+    // Emit signal when dialog is closed
+    emit dialogClosed();
+    QDialog::closeEvent(event);
 }
 
-void EscapePrisonerDialog::centerOnScreen() {
+void FailedPrisonerDialog::centerOnScreen() {
     // Get the screen geometry to calculate the center position
     QScreen *screen = QApplication::primaryScreen();
     QRect screenGeometry = screen->geometry();
@@ -167,11 +154,7 @@ void EscapePrisonerDialog::centerOnScreen() {
     this->move(x, y);
 }
 
-EscapePrisonerDialog::ButtonResult EscapePrisonerDialog::getResult() const {
-    return result;
-}
-
-int EscapePrisonerDialog::exec() {
+int FailedPrisonerDialog::exec() {
     // Center the dialog before showing
     centerOnScreen();
     return QDialog::exec();

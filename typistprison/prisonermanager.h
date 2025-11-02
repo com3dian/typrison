@@ -3,6 +3,7 @@
 
 #include <QObject>
 #include <QtMath>
+#include <QDebug>
 
 class PrisonerManager : public QObject {
     Q_OBJECT
@@ -13,16 +14,23 @@ public:
     void updateTimerProgress(qreal timerProgressLength);
     void updateTypingProgress(int typedWordCount);
     void clear();
+    bool isGoalReached();
 
 private:
     int wordGoal;
     int baseWordCount;
     qreal timerProgressLength;
     int greyWordCount;
+    int tyingWordCount;
+    bool isPrisoner;
+    bool goalReached;
 
 signals:
     void updateTimerProgressInEdit(int greyWordCount);
     void updateTypingProgressInProgressBorder(int typingWordCount);
+    void startPrisonerMode();
+    void stopPrisonerMode();
+    void prisonerModeFailed();
 
 };
 
