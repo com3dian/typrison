@@ -31,7 +31,7 @@ signals:
     void startPrisonerMode();
     void stopPrisonerMode();
     void prisonerModeFailed();
-
+    void prisonerModeSucceeded();
 };
 
 #endif // PRISONERMANAGER_H

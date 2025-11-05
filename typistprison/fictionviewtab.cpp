@@ -160,6 +160,7 @@ FictionViewTab::FictionViewTab(const QString &content,
     connect(textEdit, &FictionTextEdit::showWikiAt, this, &FictionViewTab::showWikiFunc);
     connect(textEdit, &FictionTextEdit::hideWiki, this, &FictionViewTab::hideWikiFunc);
     connect(prisonerButton, &QPushButton::clicked, this, &FictionViewTab::activatePrisonerMode);
+    connect(prisonerManager, &PrisonerManager::prisonerModeSucceeded, this, &FictionViewTab::saveContent);
 }
 
 void FictionViewTab::setupTextEdit(const QString &content) {
@@ -258,11 +259,17 @@ Save the content into `currentFilePath` file.
 if `currentFilePath` is empty, popup a file-saving dialog; and then save.
 */
 bool FictionViewTab::saveContent() {
-    if (isPrisoner) { // if in prisoner mode, do nothing
-        return false;
+    if (isPrisoner) { // if in prisoner mode and not succeeded, do nothing
+        bool isSucceeded = this->prisonerManager->isGoalReached();
+        if (!isSucceeded) {
+            return false;
+        }
     }
 
+    qDebug() << "currentFilePath: " << currentFilePath;
+
     if (currentFilePath.isEmpty()) {
+        qDebug() << "no file path provided, prompting user to select a save location";
         // If no file path is provided, prompt the user to select a save location
         QString fileName = QFileDialog::getSaveFileName(this, "Save File", "", "Text Files (*.txt);;All Files (*)");
         if (fileName.isEmpty()) {
@@ -285,6 +292,8 @@ bool FictionViewTab::saveContent() {
         emit onChangeFileType(fileName);
 
         return true;
+    } else {
+        qDebug() << "saving existing file: " << currentFilePath;
     }
 
     QFile file(currentFilePath);

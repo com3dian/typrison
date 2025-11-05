@@ -104,11 +104,11 @@ void ProgressBorderWidget::clearTypingProgress() {
 /*
 paints border with a color
 
-+--------------+
-               |
-               |
-               |
-   <-----------+
+ +--------------+
+                |
+                |
+                |
+    <-----------+
 */
 void ProgressBorderWidget::paintBorder(QPainter &painter,
                                        const QRectF &rect,
@@ -118,6 +118,12 @@ void ProgressBorderWidget::paintBorder(QPainter &painter,
                                        qreal width,
                                        qreal height,
                                        QColor color) {
+    if (progressLength < 0) {
+        // useful in case of unlimited time
+        // don't paint anything
+        return;
+    }
+
     QPointF topLeftArcFrom = rect.topLeft() + QPointF(borderMargin, 2 * borderMargin + innerRadius);
     QPointF topLeftArcTo = rect.topLeft() + QPointF(2 * borderMargin + innerRadius, borderMargin);
 
@@ -320,6 +326,7 @@ void ProgressBorderWidget::paintEvent(QPaintEvent *event) {
     
 
     qreal typingProgressLength = typingProgressLengthRatio * perimeter;
+    
     paintBorder(painter,
                 rect,
                 typingProgressLength,

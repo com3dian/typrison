@@ -32,6 +32,7 @@ void PrisonerManager::updateTimerProgress(qreal timerProgressLength) {
     this->timerProgressLength = timerProgressLength;
     greyWordCount = qRound(wordGoal * timerProgressLength) + baseWordCount;
     if (isPrisoner) {
+        // if chaser reach the progress, fail the prisoner mode
         if (tyingWordCount < greyWordCount) {
             emit prisonerModeFailed();
             return;
@@ -53,6 +54,7 @@ void PrisonerManager::updateTypingProgress(int wordCount) {
             emit updateTypingProgressInProgressBorder(wordCount - baseWordCount);
             if (wordCount - baseWordCount > wordGoal) {
                 this->goalReached = true;
+                emit prisonerModeSucceeded();
             }
         }
     }

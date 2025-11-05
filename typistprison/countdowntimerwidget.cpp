@@ -39,6 +39,9 @@ CountdownTimerWidget::~CountdownTimerWidget()
     }
 }
 
+/*
+
+*/
 void CountdownTimerWidget::setupUI()
 {
     // Create main layout
@@ -116,8 +119,8 @@ void CountdownTimerWidget::startCountdown(int seconds) {
         isActive = false;
         
         // Update text label to indicate unlimited mode
-        textLabel->setText("Challenge starts in:");
-        timeLabel->setText("unlimited");
+        textLabel->setText("This challenge has unlimited time");
+        timeLabel->setText(""); // Clear the time label since we're using textLabel for the message
         timeLabel->setStyleSheet("color: #ffffff;");
         
         // Reset opacity and show widget
