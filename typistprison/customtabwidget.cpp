@@ -96,6 +96,7 @@ void CustomTabWidget::createNewTab(const QString &filePath,
     
     // Create a new tab with the file name as the tab text
     if (tabName.endsWith(".cell.txt") || (isUntitled && filePath.isEmpty())) {
+        qDebug() << "CustomTabWidget::createNewTab - Creating FictionViewTab with filePath:" << (filePath.isEmpty() ? "(empty)" : filePath) << "isUntitled:" << isUntitled << "tabName:" << tabName;
         newTab = new FictionViewTab(content, filePath, this, false, projectManager, prisonerManager);
         connect(static_cast<FictionViewTab*>(newTab), &FictionViewTab::onChangeFileType,
                 this, &CustomTabWidget::updateFileType);
@@ -154,6 +155,7 @@ void CustomTabWidget::createFictionTab(const QString &filePath, bool isUntitled,
     }
     
     // Create a fiction view tab
+    qDebug() << "CustomTabWidget::createFictionTab - Creating tab with filePath:" << (filePath.isEmpty() ? "(empty)" : filePath) << "isUntitled:" << isUntitled << "tabName:" << tabName;
     newTab = new FictionViewTab(content, filePath, this, false, projectManager, prisonerManager);
     connect(static_cast<BaseTextEditTab*>(newTab), &BaseTextEditTab::onChangeFileType,
         this, &CustomTabWidget::updateFileType);

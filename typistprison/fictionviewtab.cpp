@@ -5,6 +5,7 @@ mot
 */
 
 #include "fictionviewtab.h"
+#include <QTabWidget>
 
 
 FictionViewTab::FictionViewTab(const QString &content,
@@ -22,6 +23,12 @@ FictionViewTab::FictionViewTab(const QString &content,
       prisonerManager(prisonerManager),
       prisonerInitialContent("")
 {
+    qDebug() << "=== FictionViewTab constructor ===";
+    qDebug() << "Instance address: 0x" << QString::number(reinterpret_cast<quintptr>(this), 16);
+    qDebug() << "File path:" << (currentFilePath.isEmpty() ? "(empty)" : currentFilePath);
+    qDebug() << "Parent:" << (parent ? parent->metaObject()->className() : "null");
+    qDebug() << "Is prisoner mode:" << isPrisoner;
+    qDebug() << "===================================";
     // Remove currentFilePath initialization as it's handled by BaseTextEditTab
     globalLayout = new QHBoxLayout(this);
     leftLayout = new QVBoxLayout();
@@ -160,7 +167,6 @@ FictionViewTab::FictionViewTab(const QString &content,
     connect(textEdit, &FictionTextEdit::showWikiAt, this, &FictionViewTab::showWikiFunc);
     connect(textEdit, &FictionTextEdit::hideWiki, this, &FictionViewTab::hideWikiFunc);
     connect(prisonerButton, &QPushButton::clicked, this, &FictionViewTab::activatePrisonerMode);
-    connect(prisonerManager, &PrisonerManager::prisonerModeSucceeded, this, &FictionViewTab::saveContent);
 }
 
 void FictionViewTab::setupTextEdit(const QString &content) {
@@ -259,6 +265,17 @@ Save the content into `currentFilePath` file.
 if `currentFilePath` is empty, popup a file-saving dialog; and then save.
 */
 bool FictionViewTab::saveContent() {
+    // Identify the caller
+    QObject *senderObj = QObject::sender();
+    QString callerInfo;
+
+    // Try to get tab information from parent CustomTabWidget
+    // Note: QTabWidget internally uses QStackedWidget, so we need to traverse up the parent chain
+    QString tabInfo = "Unknown";
+    QWidget *currentParent = parentWidget();
+    QTabWidget *tabWidget = nullptr;
+    QString parentChain = "";
+
     if (isPrisoner) { // if in prisoner mode and not succeeded, do nothing
         bool isSucceeded = this->prisonerManager->isGoalReached();
         if (!isSucceeded) {
@@ -266,10 +283,7 @@ bool FictionViewTab::saveContent() {
         }
     }
 
-    qDebug() << "currentFilePath: " << currentFilePath;
-
     if (currentFilePath.isEmpty()) {
-        qDebug() << "no file path provided, prompting user to select a save location";
         // If no file path is provided, prompt the user to select a save location
         QString fileName = QFileDialog::getSaveFileName(this, "Save File", "", "Text Files (*.txt);;All Files (*)");
         if (fileName.isEmpty()) {
@@ -292,8 +306,6 @@ bool FictionViewTab::saveContent() {
         emit onChangeFileType(fileName);
 
         return true;
-    } else {
-        qDebug() << "saving existing file: " << currentFilePath;
     }
 
     QFile file(currentFilePath);
@@ -410,6 +422,10 @@ void FictionViewTab::activatePrisonerMode() {
             &PrisonerManager::prisonerModeFailed,
             this,
             &FictionViewTab::failedPrisonerMode);
+    connect(prisonerManager,
+            &PrisonerManager::prisonerModeSucceeded,
+            this,
+            &FictionViewTab::saveContent);
 }
 
 /*
@@ -417,6 +433,7 @@ deactivate the prisoner mode by popup a dialog to confirm user want to escape
 triggered when user click prisoner button
 */
 void FictionViewTab::deactivatePrisonerMode() {
+    isPrisoner = false;
     // Prevent multiple dialogs
     if (activeEscapeDialog) {
         return;
@@ -442,9 +459,14 @@ void FictionViewTab::deactivatePrisonerMode() {
             &PrisonerManager::prisonerModeFailed,
             this,
             &FictionViewTab::deactivatePrisonerMode);
+    disconnect(prisonerManager,
+            &PrisonerManager::prisonerModeSucceeded,
+            this,
+            &FictionViewTab::saveContent);
 }
 
 void FictionViewTab::failedPrisonerMode() {
+    isPrisoner = false;
     // Block deactivation-triggered escape while showing failure dialog
     blockDeactivationEscape = true;
     // Show failed prisoner mode dialog
@@ -477,15 +499,22 @@ escape the prisoner mode
 void FictionViewTab::escapePrisonerMode() {
     // User confirmed escape
     isPrisoner = false;
+    
+    // IMPORTANT: Check goal status BEFORE emitting signal, because the signal
+    // will trigger MainWindow::deactivatePrisonerModeFunc() which calls
+    // prisonerManager->clear(), resetting goalReached to false
+    bool goalWasReached = false;
+    if (prisonerManager) {
+        goalWasReached = prisonerManager->isGoalReached();
+    }
+    
     emit deactivatePrisonerModeSignal();
     connect(prisonerButton, &QPushButton::clicked, this, &FictionViewTab::activatePrisonerMode);
     disconnect(prisonerButton, &QPushButton::clicked, this, &FictionViewTab::deactivatePrisonerMode);
 
-    if (prisonerManager) {
-        // if goal not reached, clear the progress in prisoner mode
-        if (!prisonerManager->isGoalReached()) {
-            textEdit->load(prisonerInitialContent);
-        }
+    // if goal not reached, clear the progress in prisoner mode
+    if (!goalWasReached) {
+        textEdit->load(prisonerInitialContent);
     }
 }
 
