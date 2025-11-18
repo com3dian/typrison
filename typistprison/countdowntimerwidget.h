@@ -50,9 +50,15 @@ private slots:
     // Internal slot for timer updates
     void updateCountdown();
 
+protected:
+    void resizeEvent(QResizeEvent *event) override;
+    void showEvent(QShowEvent *event) override;
+
 private:
     void setupUI();
     void updateDisplay();
+    void adjustTimeLabelFontSize();
+    void adjustTextLabelFontSize();
     QString formatTime(int seconds) const;
     
     QLabel *textLabel;

@@ -261,8 +261,10 @@ void FictionViewTab::deactivateSniperMode() {
 
 /*
 Save the content into `currentFilePath` file.
-
 if `currentFilePath` is empty, popup a file-saving dialog; and then save.
+
+in prisoner mode, if goal is not reached, do nothing.
+if the goal is reached, this method will be triggered by the prisoner manager to save the content.
 */
 bool FictionViewTab::saveContent() {
     // Identify the caller

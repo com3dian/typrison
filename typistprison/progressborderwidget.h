@@ -5,6 +5,8 @@
 #include <QTimer>
 #include <QPainter>
 #include <QPainterPath>
+#include <QLinearGradient>
+#include <QBrush>
 #include "prisonermanager.h"
 
 class ProgressBorderWidget : public QWidget {
@@ -43,7 +45,7 @@ private:
     qreal endDistance;
     PrisonerManager *prisonerManager;
 
-    void drawPath(QPainter &painter, const QPainterPath &path, QColor color);
+    void drawPath(QPainter &painter, const QPainterPath &path, QColor startColor, QColor backgroundColor, QColor endColor);
     void drawPathTest(QPainter &painter, const QPainterPath &path);
     void paintBorder(QPainter &painter,
                      const QRectF &rect,
@@ -52,7 +54,9 @@ private:
                      int innerRadius,
                      qreal width,
                      qreal height,
-                     QColor color);
+                     QColor startColor,
+                     QColor backgroundColor,
+                     QColor endColor);
 };
 
 #endif // PROGRESSBORDERWIDGET_H

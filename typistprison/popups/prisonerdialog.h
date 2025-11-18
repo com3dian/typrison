@@ -264,26 +264,31 @@ public:
                     }
                 )");
             } else {
-                actionButton->setEnabled(true);
-                actionButton->setIcons(QIcon(":/icons/right_arrow.png"), QIcon(":/icons/right_arrow_hover.png"));
-                actionButton->setSilentBehavior(R"(
-                    QPushButton {
-                        background-color: transparent;
-                        border: 1px solid #5A5A5A;
-                        color: #BDBDBD;
-                        border-radius: 4px;
-                        padding: 4px 8px;
-                    }
-                )");
-                actionButton->setHoverBehavior(R"(
-                    QPushButton {
-                        background-color: transparent;
-                        border: 1px solid #999999;
-                        color: #DEDEDE;
-                        border-radius: 4px;
-                        padding: 4px 8px;
-                    }
-                )");
+                QString numericText = lineEdit->text().remove(QRegularExpression("[^0-9]"));
+                if (numericText.isEmpty()) {
+                    actionButton->setEnabled(false);
+                } else {
+                    actionButton->setEnabled(true);
+                    actionButton->setIcons(QIcon(":/icons/right_arrow.png"), QIcon(":/icons/right_arrow_hover.png"));
+                    actionButton->setSilentBehavior(R"(
+                        QPushButton {
+                            background-color: transparent;
+                            border: 1px solid #5A5A5A;
+                            color: #BDBDBD;
+                            border-radius: 4px;
+                            padding: 4px 8px;
+                        }
+                    )");
+                    actionButton->setHoverBehavior(R"(
+                        QPushButton {
+                            background-color: transparent;
+                            border: 1px solid #999999;
+                            color: #DEDEDE;
+                            border-radius: 4px;
+                            padding: 4px 8px;
+                        }
+                    )");
+                }
             }
             if (ratio == 1.0) {
                 sliderValueLabel->setText(QString("<span style='font-size: 24px; color: white;'>%1</span>")
