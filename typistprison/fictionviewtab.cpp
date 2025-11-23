@@ -23,17 +23,14 @@ FictionViewTab::FictionViewTab(const QString &content,
       prisonerManager(prisonerManager),
       prisonerInitialContent("")
 {
-    qDebug() << "=== FictionViewTab constructor ===";
-    qDebug() << "Instance address: 0x" << QString::number(reinterpret_cast<quintptr>(this), 16);
-    qDebug() << "File path:" << (currentFilePath.isEmpty() ? "(empty)" : currentFilePath);
-    qDebug() << "Parent:" << (parent ? parent->metaObject()->className() : "null");
-    qDebug() << "Is prisoner mode:" << isPrisoner;
-    qDebug() << "===================================";
     // Remove currentFilePath initialization as it's handled by BaseTextEditTab
     globalLayout = new QHBoxLayout(this);
     leftLayout = new QVBoxLayout();
     topLeftLayout = new QHBoxLayout();
     bottomLeftLayout = new QHBoxLayout();
+
+    alphabeticRegex = QRegularExpression("\\b\\w+\\b");
+    cjkRegex = QRegularExpression("[\\p{Han}\\p{Hiragana}\\p{Katakana}]");
 
     // Add wordcount label
     wordCountLabel = new QLabel(this);
@@ -170,6 +167,7 @@ FictionViewTab::FictionViewTab(const QString &content,
 }
 
 void FictionViewTab::setupTextEdit(const QString &content) {
+    qDebug() << "FictionViewTab::setupTextEdit";
     textEdit->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     textEdit->load(content);
     textEdit->setStyleSheet(
@@ -195,6 +193,7 @@ void FictionViewTab::setupTextEdit(const QString &content) {
 }
 
 void FictionViewTab::setupScrollBar() {
+    qDebug() << "FictionViewTab::setupScrollBar";
     vScrollBar->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Expanding);
     vScrollBar->setStyleSheet(
         "QScrollBar:vertical {"
@@ -229,6 +228,7 @@ void FictionViewTab::setupScrollBar() {
 }
 
 void FictionViewTab::syncScrollBar() {
+    qDebug() << "FictionViewTab::syncScrollBar";
     QScrollBar* internalScrollBar = textEdit->verticalScrollBar();
     vScrollBar->setRange(internalScrollBar->minimum(), internalScrollBar->maximum());
     vScrollBar->setPageStep(internalScrollBar->pageStep());
@@ -239,6 +239,7 @@ void FictionViewTab::syncScrollBar() {
 }
 
 void FictionViewTab::activateSniperMode() {
+    qDebug() << "FictionViewTab::activateSniperMode";
     textEdit->activateSniperMode();
     disconnect(textEdit, &QTextEdit::textChanged, this, &FictionViewTab::updateWordcount);
     this->updateWordcount(); // update word count immediately after switching mode
@@ -250,6 +251,7 @@ void FictionViewTab::activateSniperMode() {
 }
 
 void FictionViewTab::deactivateSniperMode() {
+    qDebug() << "FictionViewTab::deactivateSniperMode";
     textEdit->deactivateSniperMode();
     connect(textEdit, &QTextEdit::textChanged, this, &FictionViewTab::updateWordcount);
     if(!wordCountLabel->isVisible()) {
@@ -267,6 +269,7 @@ in prisoner mode, if goal is not reached, do nothing.
 if the goal is reached, this method will be triggered by the prisoner manager to save the content.
 */
 bool FictionViewTab::saveContent() {
+    qDebug() << "FictionViewTab::saveContent";
     // Identify the caller
     QObject *senderObj = QObject::sender();
     QString callerInfo;
@@ -325,22 +328,18 @@ bool FictionViewTab::saveContent() {
 }
 
 void FictionViewTab::editContent() {
+    qDebug() << "FictionViewTab::editContent";
     emit onChangeTabName(QFileInfo(currentFilePath).fileName() + "*");
 }
 
 int FictionViewTab::getBaseWordCount() {
+    qDebug() << "FictionViewTab::getBaseWordCount";
     QString text = textEdit->toPlainText();
     if (text.isEmpty()) {
         return 0;
     }
 
     int wordCount = 0;
-
-    // Regular expression for alphabetic languages (English, etc.)
-    QRegularExpression alphabeticRegex("\\b\\w+\\b");
-
-    // Regular expression for CJK (Chinese, Japanese, Korean) characters
-    QRegularExpression cjkRegex("[\\p{Han}\\p{Hiragana}\\p{Katakana}]");
 
     QRegularExpressionMatchIterator i = alphabeticRegex.globalMatch(text);
     while (i.hasNext()) {
@@ -358,6 +357,7 @@ int FictionViewTab::getBaseWordCount() {
 }
 
 void FictionViewTab::updateWordcount() {
+    qDebug() << "FictionViewTab::updateWordcount";
     // if word count label is not visible, make it visible
     if (!wordCountLabel->isVisible()) {
         wordCountLabel->setVisible(true);
@@ -378,6 +378,7 @@ void FictionViewTab::updateWordcount() {
 }
 
 void FictionViewTab::activatePrisonerMode() {
+    qDebug() << "FictionViewTab::activatePrisonerMode";
     // create a dialog for setting goal and time limit
     // if user click cancel, do nothing
     // if user click ok, save the content and activate prisoner mode
@@ -435,7 +436,7 @@ deactivate the prisoner mode by popup a dialog to confirm user want to escape
 triggered when user click prisoner button
 */
 void FictionViewTab::deactivatePrisonerMode() {
-    isPrisoner = false;
+    qDebug() << "FictionViewTab::deactivatePrisonerMode";
     // Prevent multiple dialogs
     if (activeEscapeDialog) {
         return;
@@ -453,21 +454,16 @@ void FictionViewTab::deactivatePrisonerMode() {
     
     if (result == QDialog::Accepted && activeEscapeDialog->getResult() == EscapePrisonerDialog::Escape) {
         this->escapePrisonerMode();
+    } else {
+        // User chose "Stay Focused" or cancelled - ensure isPrisoner remains true
+        isPrisoner = true;
     }
     // If rejected or "Stay Focused" was clicked, do nothing (stay in prisoner mode)
-    
     activeEscapeDialog->deleteLater();
-    disconnect(prisonerManager,
-            &PrisonerManager::prisonerModeFailed,
-            this,
-            &FictionViewTab::deactivatePrisonerMode);
-    disconnect(prisonerManager,
-            &PrisonerManager::prisonerModeSucceeded,
-            this,
-            &FictionViewTab::saveContent);
 }
 
 void FictionViewTab::failedPrisonerMode() {
+    qDebug() << "FictionViewTab::failedPrisonerMode";
     isPrisoner = false;
     // Block deactivation-triggered escape while showing failure dialog
     blockDeactivationEscape = true;
@@ -499,6 +495,7 @@ void FictionViewTab::failedPrisonerMode() {
 escape the prisoner mode
 */
 void FictionViewTab::escapePrisonerMode() {
+    qDebug() << "FictionViewTab::escapePrisonerMode";
     // User confirmed escape
     isPrisoner = false;
     
@@ -509,10 +506,20 @@ void FictionViewTab::escapePrisonerMode() {
     if (prisonerManager) {
         goalWasReached = prisonerManager->isGoalReached();
     }
-    
+
     emit deactivatePrisonerModeSignal();
     connect(prisonerButton, &QPushButton::clicked, this, &FictionViewTab::activatePrisonerMode);
     disconnect(prisonerButton, &QPushButton::clicked, this, &FictionViewTab::deactivatePrisonerMode);
+
+    // Disconnect prisoner manager signals since we're exiting prisoner mode
+    disconnect(prisonerManager,
+            &PrisonerManager::prisonerModeFailed,
+            this,
+            &FictionViewTab::failedPrisonerMode);
+    disconnect(prisonerManager,
+            &PrisonerManager::prisonerModeSucceeded,
+            this,
+            &FictionViewTab::saveContent);
 
     // if goal not reached, clear the progress in prisoner mode
     if (!goalWasReached) {
@@ -529,10 +536,12 @@ bool FictionViewTab::isInPrisonerMode() const {
 }
 
 bool FictionViewTab::isDeactivationEscapeBlocked() const {
+    qDebug() << "FictionViewTab::isDeactivationEscapeBlocked";
     return blockDeactivationEscape;
 }
 
 void FictionViewTab::resizeEvent(QResizeEvent *event) {
+    qDebug() << "FictionViewTab::resizeEvent";
     QWidget::resizeEvent(event);
     
     // Calculate a proportional minimum width based on the tab's width
@@ -544,9 +553,11 @@ void FictionViewTab::resizeEvent(QResizeEvent *event) {
 }
 
 void FictionViewTab::showWikiFunc(const QString &wikiContent, QPoint lastMousePos) {
+    qDebug() << "FictionViewTab::showWikiFunc";
     emit showWikiAt(wikiContent, lastMousePos);
 }
 
 void FictionViewTab::hideWikiFunc() {
+    qDebug() << "FictionViewTab::hideWikiFunc";
     emit hideWiki();
 }

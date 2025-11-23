@@ -61,6 +61,8 @@ private:
     QString prisonerInitialContent;
     EscapePrisonerDialog *activeEscapeDialog = nullptr;
     bool blockDeactivationEscape = false;
+    QRegularExpression alphabeticRegex;
+    QRegularExpression cjkRegex;
 
     void setupTextEdit(const QString &content);
     void setupScrollBar();

@@ -106,6 +106,7 @@ private:
     static int findBlockClosestToCenterWorker(const DocumentData &data);
     void onBlockSearchComplete();
     void refresh();
+    void onTextChanged();
     void updateCursorPosition();
     void readBlock();
     // void toggleCursorVisibility();
@@ -124,6 +125,7 @@ private:
     QString previousDocumentText;
     
     QTimer *timer;
+    QTimer *refreshTimer;
     QPoint lastMousePos;
     bool isInit;
     // Threading support for block computation

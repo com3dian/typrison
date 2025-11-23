@@ -155,7 +155,6 @@ void CustomTabWidget::createFictionTab(const QString &filePath, bool isUntitled,
     }
     
     // Create a fiction view tab
-    qDebug() << "CustomTabWidget::createFictionTab - Creating tab with filePath:" << (filePath.isEmpty() ? "(empty)" : filePath) << "isUntitled:" << isUntitled << "tabName:" << tabName;
     newTab = new FictionViewTab(content, filePath, this, false, projectManager, prisonerManager);
     connect(static_cast<BaseTextEditTab*>(newTab), &BaseTextEditTab::onChangeFileType,
         this, &CustomTabWidget::updateFileType);

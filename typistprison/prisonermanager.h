@@ -15,6 +15,7 @@ public:
     void updateTypingProgress(int typedWordCount);
     void clear();
     bool isGoalReached();
+    bool isInPrisonerMode() const;
 
 private:
     int wordGoal;

@@ -599,7 +599,7 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
 }
 
 void MainWindow::changeEvent(QEvent *event) {
-    qDebug() << "changeEvent";
+    // qDebug() << "MainWindow::changeEvent";
     if (event->type() == QEvent::ActivationChange) {
         if (!this->isActiveWindow()) {
             QWidget *current = customTabWidget ? customTabWidget->currentWidget() : nullptr;
@@ -626,6 +626,7 @@ Show a drop down list of options when mouse entering menu buttons.
 menu buttons are the (file, project) buttons in (top left) function bar.
 */
 void MainWindow::handleMouseEnterMenuButton(QPushButton *button) {
+    qDebug() << "MainWindow::handleMouseEnterMenuButton";
     // Remove any existing frame if present.
     if (existingFrame) {
         existingFrame->setParent(nullptr);
@@ -885,6 +886,7 @@ Remove the drop down option list when mouse leaving menu buttons.
 menu buttons are the (file, project) buttons in (top left) function bar.
 */
 void MainWindow::handleFocusLeaveMenuButton() {
+    qDebug() << "MainWindow::handleFocusLeaveMenuButton";
     if (existingFrame) {
         existingFrame->setVisible(false);
     }
@@ -907,6 +909,7 @@ triggered by QMarkdownTextEdit::readBlock -> (signal) showImageAt(imagePath, glo
 this method will try to read the image from file-system or download from internet.
 */
 void MainWindow::showMarkdownImage(const QString &imagePath, QPoint lastMousePos) {
+    qDebug() << "MainWindow::showMarkdownImage";
     // Check if imagePath is a URL
     QUrl url(imagePath);
     if (url.isValid() && (url.scheme() == "http" || url.scheme() == "https")) {
@@ -955,6 +958,7 @@ Show a floating window that displays image.
 max size for image frame is [800, 600]
 */
 void MainWindow::displayImage(const QPixmap &pixmap, QPoint lastMousePos) {
+    qDebug() << "MainWindow::displayImage";
     // Define maximum dimensions for the scaled image
     const int MAX_WIDTH = 800;
     const int MAX_HEIGHT = 600;
@@ -1031,6 +1035,7 @@ void MainWindow::displayImage(const QPixmap &pixmap, QPoint lastMousePos) {
 }
 
 void MainWindow::hideMarkdownImage() {
+    qDebug() << "MainWindow::hideMarkdownImage";
     if (imageFrame) {
         imageFrame->hide();  // Hide the frame
     }
@@ -1046,6 +1051,7 @@ Show wiki content in a popup frame.
                    +----------------+
 */
 void MainWindow::showWiki(const QString &wikiContent, QPoint lastMousePos) {
+    qDebug() << "MainWindow::showWiki";
     // Create WikiFrame if it doesn't exist
     if (!wikiFrame) {
         wikiFrame = new WikiFrame(this);
@@ -1099,6 +1105,7 @@ folder
        +-----------+
 */
 void MainWindow::showContextMenu(const QStringList &options, const QModelIndex &index, bool isDir) {
+    qDebug() << "MainWindow::showContextMenu";
     // Store the index and type for later use
     currentContextMenuIndex = index;
     isContextMenuForDir = isDir;
@@ -1180,6 +1187,7 @@ void MainWindow::showContextMenu(const QStringList &options, const QModelIndex &
 }
 
 void MainWindow::handleContextMenuSelection(const QString &action) {
+    qDebug() << "MainWindow::handleContextMenuSelection";
     // Hide the context menu frame
     if (contextMenuFrame) {
         contextMenuFrame->hide();
@@ -1190,6 +1198,7 @@ void MainWindow::handleContextMenuSelection(const QString &action) {
 }
 
 void MainWindow::openFileTreeView() {
+    qDebug() << "MainWindow::openFileTreeView";
     QList<int> sizes = centralSplitter->sizes();
     if (sizes[0] == 0) {  // Only open if it's currently closed
         toggleFileTreeView();
@@ -1197,6 +1206,7 @@ void MainWindow::openFileTreeView() {
 }
 
 void MainWindow::closeFileTreeView() {
+    qDebug() << "MainWindow::closeFileTreeView";
     QList<int> sizes = centralSplitter->sizes();
     if (sizes[0] != 0) {  // Only close if it's currently open
         toggleFileTreeView();
@@ -1204,6 +1214,7 @@ void MainWindow::closeFileTreeView() {
 }
 
 void MainWindow::activatePrisonerModeFunc(int timeLimit, int wordGoal) {
+    qDebug() << "MainWindow::activatePrisonerModeFunc";
     // Store the parameters for when countdown finishes
     int countdownTimeLimit = -1;
 
@@ -1244,6 +1255,7 @@ void MainWindow::activatePrisonerModeFunc(int timeLimit, int wordGoal) {
 }
 
 void MainWindow::deactivatePrisonerModeFunc() {
+    qDebug() << "MainWindow::deactivatePrisonerModeFunc";
     // Show customtabbar
     functionBar->setVisible(true);
 
@@ -1280,21 +1292,23 @@ needed for resizing window in linux
                 |
 */
 Qt::Edges MainWindow::edgeAt(const QPoint &pos) const {
-        Qt::Edges edges;
-        QRect r = rect();
-        if (pos.x() <= RESIZE_MARGIN) {
-            edges |= Qt::LeftEdge;
-        } else if (pos.x() >= r.width() - RESIZE_MARGIN) {
-            edges |= Qt::RightEdge;
-        }
-        
-        if (pos.y() >= r.height() - RESIZE_MARGIN) {
-            edges |= Qt::BottomEdge;
-        }
-        return edges;
+    qDebug() << "MainWindow::edgeAt";
+    Qt::Edges edges;
+    QRect r = rect();
+    if (pos.x() <= RESIZE_MARGIN) {
+        edges |= Qt::LeftEdge;
+    } else if (pos.x() >= r.width() - RESIZE_MARGIN) {
+        edges |= Qt::RightEdge;
     }
+    
+    if (pos.y() >= r.height() - RESIZE_MARGIN) {
+        edges |= Qt::BottomEdge;
+    }
+    return edges;
+}
 
 void MainWindow::updateCursor(const Qt::Edges &edges) {
+    qDebug() << "MainWindow::updateCursor";
     // Get the widget under the cursor
     QWidget* widgetUnderCursor = QApplication::widgetAt(QCursor::pos());
     
@@ -1312,6 +1326,7 @@ void MainWindow::updateCursor(const Qt::Edges &edges) {
 }
 
 void MainWindow::mousePressEvent(QMouseEvent *event) {
+    qDebug() << "MainWindow::mousePressEvent";
     #ifdef Q_OS_LINUX
         if (event->button() == Qt::LeftButton) {
             Qt::Edges e = edgeAt(event->pos());
@@ -1326,6 +1341,7 @@ void MainWindow::mousePressEvent(QMouseEvent *event) {
 }
 
 void MainWindow::mouseMoveEvent(QMouseEvent *event) {
+    qDebug() << "MainWindow::mouseMoveEvent";
     #ifdef Q_OS_LINUX
         // only change cursor if not dragging
         if (!(event->buttons() and Qt::LeftButton)) {

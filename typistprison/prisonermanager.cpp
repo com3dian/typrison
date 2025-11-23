@@ -63,3 +63,7 @@ void PrisonerManager::updateTypingProgress(int wordCount) {
 bool PrisonerManager::isGoalReached() {
     return this->goalReached;
 }
+
+bool PrisonerManager::isInPrisonerMode() const {
+    return this->isPrisoner;
+}

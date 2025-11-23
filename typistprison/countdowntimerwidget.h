@@ -57,8 +57,6 @@ protected:
 private:
     void setupUI();
     void updateDisplay();
-    void adjustTimeLabelFontSize();
-    void adjustTextLabelFontSize();
     QString formatTime(int seconds) const;
     
     QLabel *textLabel;

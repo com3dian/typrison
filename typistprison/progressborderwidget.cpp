@@ -1,3 +1,9 @@
+/*
+Widget holds all visible items.
+
+Border of this widget used to show progress in prisoner mode.
+*/
+
 #include "progressborderwidget.h"
 
 ProgressBorderWidget::ProgressBorderWidget(QWidget *parent, PrisonerManager *prisonerManager)
@@ -27,6 +33,18 @@ ProgressBorderWidget::ProgressBorderWidget(QWidget *parent, PrisonerManager *pri
         &PrisonerManager::prisonerModeFailed,
         this,
         &ProgressBorderWidget::deactivatePrisonerMode);
+    }
+
+    repaintTimer = new QTimer(this);
+    repaintTimer->setInterval(16); // ~60 FPS
+    repaintTimer->setSingleShot(true);
+    connect(repaintTimer, &QTimer::timeout, this, QOverload<>::of(&ProgressBorderWidget::update));
+}
+
+void ProgressBorderWidget::requestRepaint()
+{
+    if (!repaintTimer->isActive()) {
+        repaintTimer->start();
     }
 }
 
@@ -64,16 +82,14 @@ void ProgressBorderWidget::startTimerProgress(int timeLimit, int wordGoal) {
 void ProgressBorderWidget::clearTimerProgress() {
     prisonerTimer->stop();
     timerProgress = 0;
-    update(); // repaint
-    emit needsRepaint();
+    requestRepaint();
     isTimerRunning = false;
-    isPrisoner = false;
+    isPrisoner = false;                                                      
 }
 
 void ProgressBorderWidget::updateTimerProgress() {
     timerProgress = timerProgress + 1;
-    update(); // repaint
-    emit needsRepaint();
+    requestRepaint();
 
     if (prisonerManager && totalTime > 0.0) {
         qreal normalizedProgress = timerProgress / totalTime;
@@ -90,15 +106,13 @@ void ProgressBorderWidget::updateTypingProgress(int wordCount) {
     
     // Only update visual progress if prisoner mode is actually active
     if (isPrisoner) {
-        update();
-        emit needsRepaint();
+        requestRepaint();
     }
 }
 
 void ProgressBorderWidget::clearTypingProgress() {
     typingProgressLengthRatio = 0.0;
-    update();
-    emit needsRepaint();
+    requestRepaint();
 }
 
 /*
@@ -138,8 +152,8 @@ void ProgressBorderWidget::paintBorder(QPainter &painter,
     QPointF bottomLeftArcFrom = rect.bottomLeft() + QPointF(2 * borderMargin + innerRadius, -borderMargin);
     QPointF bottomLeftArcTo = rect.bottomLeft() + QPointF(borderMargin, - 2 * borderMargin - innerRadius);
 
-    startDistance = 120;
-    endDistance = 60;
+    startDistance = 180;
+    endDistance = 90;
     QPointF startPoint = topLeftArcTo + QPointF(startDistance, 0);
     QPointF endPoint = topLeftArcFrom + QPointF(0, endDistance);
     QPainterPath path;
@@ -267,6 +281,7 @@ paint the widget
 +---------------+
 */
 void ProgressBorderWidget::paintEvent(QPaintEvent *event) {
+    qDebug() << "ProgressBorderWidget::paintEvent";
     Q_UNUSED(event);
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
@@ -304,13 +319,13 @@ void ProgressBorderWidget::paintEvent(QPaintEvent *event) {
         timerProgressLength = (timerProgress / totalTime) * perimeter;
     }
 
-    QColor chaserColorEnd = QColor("#2C2C2C");
+    QColor chaserColorEnd = QColor("#804337");
     QColor chaserColorBackground = QColor("#2C2C2C"); // Color the line fades to
-    QColor chaserColorStart = QColor("#393B3B");
+    QColor chaserColorStart = QColor("#E0715C");
 
-    QColor progressColorEnd = QColor("#84E0A5");
+    QColor progressColorEnd = QColor("#3F7050"); 
     QColor progressColorBackground = QColor("#2C2C2C"); // Color the line fades to
-    QColor progressColorStart = QColor("#4F8B64");
+    QColor progressColorStart = QColor("#84E0A5");
     
     QColor backgroundColorEnd = QColor("#1F2020");
     QColor backgroundColorBackground = QColor("#1F2020"); // Color the line fades to
@@ -363,106 +378,100 @@ void ProgressBorderWidget::paintEvent(QPaintEvent *event) {
                 chaserColorEnd);
 }
 
+/*
+  [tail]--------------->[head]
+[end color]          [start color]
+*/
 void ProgressBorderWidget::drawPath(QPainter &painter,
                                     const QPainterPath &path,
                                     QColor startColor,
                                     QColor backgroundColor,
                                     QColor endColor) {
-    // Check if path has zero length - if so, don't draw anything
-    if (path.length() <= 0.0 || path.elementCount() == 0) {
+    if (path.isEmpty()) {
         return;
     }
-    
+
     qreal penWidth = 8;
-    qreal radius = penWidth / 2.0; // Half of the borderline width
-    qreal pathLength = path.length();
-    
-    // To make the gradient follow the path geometry (not just a straight line),
-    // we draw the path in many small segments, each with a color based on its
-    // position along the path. This ensures the gradient follows curves and corners.
-    
-    // Calculate number of segments based on path length for smooth gradient
-    // More segments = smoother gradient, especially around curves
-    const int numSegments = qMax(100, static_cast<int>(pathLength / 1.5));
-    const qreal segmentStep = 1.0 / numSegments;
-    
-    // Gradient configuration: limit gradient length in actual path units (not ratio)
-    // maxGradientLength: maximum actual length of gradient transition in path units (e.g., pixels)
-    // The gradient will always reach the end (100%), but its length is limited
-    const qreal maxGradientLength = 150.0;  // Maximum gradient length in path units (e.g., 150 pixels)
-    
-    // Calculate gradient start position and length
-    // Gradient always ends at 100% (path end), but length is limited to maxGradientLength in actual units
-    qreal actualGradientLength = qMin(maxGradientLength, pathLength);
-    qreal gradientLengthRatio = (pathLength > 0) ? (actualGradientLength / pathLength) : 1.0;  // Convert to ratio for calculations
-    qreal gradientStart = qMax(0.0, 1.0 - gradientLengthRatio);  // Start position so gradient ends at 100%, clamped to [0, 1]
-    
-    // Get the end point for drawing the end circle
-    QPointF endPoint = path.pointAtPercent(1.0);
-    
-    // Configure pen properties that remain constant
     QPen pen;
     pen.setWidth(penWidth);
     pen.setCapStyle(Qt::RoundCap);
     pen.setJoinStyle(Qt::RoundJoin);
+
+    qreal pathLength = path.length();
+    qreal gradientLength = 80.0; // Only last 40 pixels have gradient
     
-    // Draw the path segment by segment, with color based on position along the path
-    for (int i = 0; i < numSegments; ++i) {
-        qreal tStart = i * segmentStep;
-        qreal tEnd = (i + 1) * segmentStep;
-        
-        // Clamp to [0, 1]
-        if (tEnd > 1.0) {
-            tEnd = 1.0;
-        }
-        
-        // Calculate color based on position along the path (path-following gradient)
-        // Gradient always reaches the end (100%), with length limited to maxGradientLength
-        qreal colorPosition = (tStart + tEnd) / 2.0; // Use midpoint for smoother color transitions
-        QColor segmentColor;
-        
-        if (colorPosition <= gradientStart) {
-            // Keep startColor for the first part of the path (before gradient starts)
-            segmentColor = startColor;
-        } else {
-            // Transition from startColor to backgroundColor within the gradient range
-            // Gradient always ends at 100% (path end), so we interpolate from gradientStart to 1.0
-            qreal transitionProgress = (colorPosition - gradientStart) / gradientLengthRatio;
-            transitionProgress = qBound(0.0, transitionProgress, 1.0);
+    if (pathLength <= gradientLength) {
+        // If path is shorter than gradient length, draw with gradient along the curve
+        int segments = qMax(10, (int)(pathLength / 2)); // More segments for smoother gradient
+        for (int i = 0; i < segments; i++) {
+            qreal t1 = (qreal)i / segments;
+            qreal t2 = (qreal)(i + 1) / segments;
             
-            // Interpolate between startColor and backgroundColor
-            segmentColor = QColor(
-                static_cast<int>(startColor.red() + (backgroundColor.red() - startColor.red()) * transitionProgress),
-                static_cast<int>(startColor.green() + (backgroundColor.green() - startColor.green()) * transitionProgress),
-                static_cast<int>(startColor.blue() + (backgroundColor.blue() - startColor.blue()) * transitionProgress),
-                static_cast<int>(startColor.alpha() + (backgroundColor.alpha() - startColor.alpha()) * transitionProgress)
-            );
+            // Interpolate color based on position along path
+            qreal colorT = t1;
+            QColor segmentColor;
+            segmentColor.setRedF(endColor.redF() + (backgroundColor.redF() - endColor.redF()) * colorT);
+            segmentColor.setGreenF(endColor.greenF() + (backgroundColor.greenF() - endColor.greenF()) * colorT);
+            segmentColor.setBlueF(endColor.blueF() + (backgroundColor.blueF() - endColor.blueF()) * colorT);
+            segmentColor.setAlphaF(endColor.alphaF() + (backgroundColor.alphaF() - endColor.alphaF()) * colorT);
+            
+            QPainterPath segment;
+            segment.moveTo(path.pointAtPercent(t1));
+            segment.lineTo(path.pointAtPercent(t2));
+            
+            pen.setColor(segmentColor);
+            painter.setPen(pen);
+            painter.drawPath(segment);
         }
+    } else {
+        // Draw the solid color part (everything except the last 40 pixels)
+        qreal solidPercent = (pathLength - gradientLength) / pathLength;
         
-        // Create a small subpath for this segment that follows the curve
-        // We sample multiple points within the segment to accurately follow curved paths
-        QPainterPath segmentPath;
-        QPointF segmentStart = path.pointAtPercent(tStart);
-        segmentPath.moveTo(segmentStart);
-        
-        // Sample points along this segment to accurately follow curves
-        // More subdivisions = better curve following, but slightly more expensive
-        const int segmentSubdivisions = 3;
-        for (int j = 1; j <= segmentSubdivisions; ++j) {
-            qreal t = tStart + (tEnd - tStart) * (j / static_cast<qreal>(segmentSubdivisions));
-            if (t > 1.0) t = 1.0;
-            segmentPath.lineTo(path.pointAtPercent(t));
-        }
-        
-        // Draw this segment with the calculated color
-        pen.setColor(segmentColor);
+        // Draw solid portion in fewer segments for performance
+        int solidSegments = qMax(10, (int)((pathLength - gradientLength) / 5));
+        pen.setColor(endColor);
         painter.setPen(pen);
-        painter.drawPath(segmentPath);
+        
+        for (int i = 0; i < solidSegments; i++) {
+            qreal t1 = (qreal)i / solidSegments * solidPercent;
+            qreal t2 = (qreal)(i + 1) / solidSegments * solidPercent;
+            
+            QPainterPath segment;
+            segment.moveTo(path.pointAtPercent(t1));
+            segment.lineTo(path.pointAtPercent(t2));
+            painter.drawPath(segment);
+        }
+        
+        // Draw the gradient part (last 40 pixels) with color interpolation
+        int gradientSegments = qMax(10, (int)(gradientLength / 2)); // More segments for smooth gradient
+        
+        for (int i = 0; i < gradientSegments; i++) {
+            qreal t1 = solidPercent + (qreal)i / gradientSegments * (1.0 - solidPercent);
+            qreal t2 = solidPercent + (qreal)(i + 1) / gradientSegments * (1.0 - solidPercent);
+            
+            // Interpolate color from endColor to backgroundColor
+            qreal colorT = (qreal)i / gradientSegments;
+            QColor segmentColor;
+            segmentColor.setRedF(endColor.redF() + (backgroundColor.redF() - endColor.redF()) * colorT);
+            segmentColor.setGreenF(endColor.greenF() + (backgroundColor.greenF() - endColor.greenF()) * colorT);
+            segmentColor.setBlueF(endColor.blueF() + (backgroundColor.blueF() - endColor.blueF()) * colorT);
+            segmentColor.setAlphaF(endColor.alphaF() + (backgroundColor.alphaF() - endColor.alphaF()) * colorT);
+            
+            QPainterPath segment;
+            segment.moveTo(path.pointAtPercent(t1));
+            segment.lineTo(path.pointAtPercent(t2));
+            
+            pen.setColor(segmentColor);
+            painter.setPen(pen);
+            painter.drawPath(segment);
+        }
     }
-    
-    // Draw a round point at the end of the path with endColor
-    painter.setBrush(endColor);
+
+    // Draw a round point at the head of the path with startColor
+    painter.setBrush(startColor);
     painter.setPen(Qt::NoPen); // No outline for the circle
+    qreal radius = penWidth / 2.0;
+    QPointF endPoint = path.pointAtPercent(1.0);
     QRectF endCircleRect(endPoint.x() - radius, endPoint.y() - radius, 
                          2 * radius, 2 * radius);
     painter.drawEllipse(endCircleRect);

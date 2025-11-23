@@ -45,7 +45,7 @@ FictionTextEdit::FictionTextEdit(QWidget *parent,
 
     highlighter = new FictionHighlighter(this->document());
 
-    connect(this, &QTextEdit::textChanged, this, &FictionTextEdit::refresh);
+    connect(this, &QTextEdit::textChanged, this, &FictionTextEdit::onTextChanged);
     connect(this, &QTextEdit::cursorPositionChanged, this, &FictionTextEdit::updateCursorPosition);
 
     // image popup
@@ -53,6 +53,11 @@ FictionTextEdit::FictionTextEdit(QWidget *parent,
     timer = new QTimer(this);
     timer->setSingleShot(true);
     connect(timer, &QTimer::timeout, this, &FictionTextEdit::readBlock);
+
+    refreshTimer = new QTimer(this);
+    refreshTimer->setSingleShot(true);
+    refreshTimer->setInterval(300); // 300ms delay
+    connect(refreshTimer, &QTimer::timeout, this, &FictionTextEdit::refresh);
     
     // Initialize threading support for block computation
     blockSearchWatcher = new QFutureWatcher<int>(this);
@@ -69,8 +74,14 @@ FictionTextEdit::FictionTextEdit(QWidget *parent,
 
 }
 
+void FictionTextEdit::onTextChanged()
+{
+    refreshTimer->start();
+}
+
 void FictionTextEdit::setTopMargin(int margin)
 {
+    qDebug() << "FictionTextEdit::setTopMargin";
     QTextDocument *doc = this->document();
     QTextFrame *rootFrame = doc->rootFrame();
 
@@ -81,6 +92,7 @@ void FictionTextEdit::setTopMargin(int margin)
 
 void FictionTextEdit::applyBlockFormatting(QTextBlock &block)
 {
+    qDebug() << "FictionTextEdit::applyBlockFormatting";
     bool isFirstBlock = block.blockNumber() == 0;
 
     // Create a cursor at the start of the block
@@ -104,6 +116,7 @@ void FictionTextEdit::applyBlockFormatting(QTextBlock &block)
 
 QTextCursor FictionTextEdit::applyCharFormatting(QTextCursor &cursor, bool insertLargeFont)
 {
+    qDebug() << "FictionTextEdit::applyCharFormatting";
     bool isFirstBlock = cursor.blockNumber() == 0;
 
     QTextCharFormat charFormat = cursor.charFormat();  // Get current char format
@@ -134,6 +147,7 @@ QTextCursor FictionTextEdit::applyCharFormatting(QTextCursor &cursor, bool inser
 
 QTextCursor FictionTextEdit::applyCharFormatting4NextBlock(QTextCursor &cursor)
 {
+    qDebug() << "FictionTextEdit::applyCharFormatting4NextBlock";
     bool isFirstBlock = cursor.blockNumber() == 0;
 
     QTextCharFormat charFormat = cursor.charFormat();  // Get current char format
@@ -229,7 +243,7 @@ QTextCursor FictionTextEdit::applyCharFormatting4NextBlock(QTextCursor &cursor)
 
 */
 void FictionTextEdit::keyPressEvent(QKeyEvent *event) {
-
+    qDebug() << "FictionTextEdit::keyPressEvent";
     if (isInit) {
         isInit = false;
         this->document()->clearUndoRedoStacks();
@@ -288,9 +302,9 @@ void FictionTextEdit::keyPressEvent(QKeyEvent *event) {
 
 void FictionTextEdit::load(const QString &text, bool keepCursorPlace)
 {
+    qDebug() << "FictionTextEdit::load";
     // detach the FictionTextEdit::refresh to prevent slow out loading
     if (projectManager) {
-        disconnect(this, &QTextEdit::textChanged, this, &FictionTextEdit::refresh);
     }
 
     // Clear existing content
@@ -365,7 +379,6 @@ void FictionTextEdit::load(const QString &text, bool keepCursorPlace)
 
     // attach the FictionTextEdit::refresh to textchanged() signal
     if (projectManager) {
-        connect(this, &QTextEdit::textChanged, this, &FictionTextEdit::refresh);
     }
 
     this->refresh();
@@ -373,6 +386,7 @@ void FictionTextEdit::load(const QString &text, bool keepCursorPlace)
 
 void FictionTextEdit::insertFromMimeData(const QMimeData *source)
 {
+    qDebug() << "FictionTextEdit::insertFromMimeData";
     // Get plain text from the source
     QString plainText = source->text();
 
@@ -411,6 +425,7 @@ void FictionTextEdit::insertFromMimeData(const QMimeData *source)
 }
 
 void FictionTextEdit::changeFontSize(int delta) {
+    qDebug() << "FictionTextEdit::changeFontSize";
     // Find the most centered block
     QTextBlock centerBlock = findBlockClosestToCenter();
     QRectF centerBlockRect = document()->documentLayout()->blockBoundingRect(centerBlock);
@@ -510,6 +525,7 @@ returns: QTextBlock
     block closest to the center of the visible area
 */
 QTextBlock FictionTextEdit::findBlockClosestToCenter() {
+    qDebug() << "FictionTextEdit::findBlockClosestToCenter";
     QTextDocument *doc = document();
     int centerY = getVisibleCenterY();
 
@@ -648,6 +664,7 @@ void FictionTextEdit::findBlockClosestToCenterAsyncThrottled() {
 }
 
 void FictionTextEdit::findBlockClosestToCenterAsyncImpl() {
+    qDebug() << "FictionTextEdit::findBlockClosestToCenterAsyncImpl";
     // Cancel any existing computation to avoid stacking multiple requests
     if (blockSearchWatcher->isRunning()) {
         blockSearchFuture.cancel();
@@ -691,6 +708,7 @@ void FictionTextEdit::findBlockClosestToCenterAsyncImpl() {
 }
 
 int FictionTextEdit::findBlockClosestToCenterWorker(const DocumentData &data) {
+    qDebug() << "FictionTextEdit::findBlockClosestToCenterWorker";
     if (data.blocks.isEmpty()) {
         return -1;
     }
@@ -823,6 +841,7 @@ void FictionTextEdit::onBlockSearchComplete() {
 }
 
 void FictionTextEdit::updateFocusBlock() {
+    qDebug() << "FictionTextEdit::updateFocusBlock";
     disconnect(this, &QTextEdit::textChanged, this, &FictionTextEdit::refresh);
 
     int centerY = getVisibleCenterY();
@@ -860,11 +879,12 @@ void FictionTextEdit::updateFocusBlock() {
     // Find the new centered block asynchronously with throttling for frequent scroll events
     findBlockClosestToCenterAsyncThrottled();
     
-    connect(this, &QTextEdit::textChanged, this, &FictionTextEdit::refresh);
+    // connect(this, &QTextEdit::textChanged, this, &FictionTextEdit::refresh);
 }
 
 void FictionTextEdit::changeGlobalTextColor(const QColor &color)
 {
+    qDebug() << "FictionTextEdit::changeGlobalTextColor";
     // Select the entire document
     QTextCursor cursor(this->document());
     cursor.select(QTextCursor::Document);
@@ -989,15 +1009,12 @@ refresh() used to filter banned words when user input;
 └────────┘
 */
 void FictionTextEdit::refresh() {
+    qDebug() << "FictionTextEdit::refresh";
     if (projectManager) {
         if (projectManager->isLoadedProject) {
-            // detach the FictionTextEdit::refresh to prevent slow out loading
-            disconnect(this, &QTextEdit::textChanged, this, &FictionTextEdit::refresh);
-            
             QString currentDocumentText = this->toPlainText();
             // if no text changes is loaded into document
             if (currentDocumentText == previousDocumentText) {
-                connect(this, &QTextEdit::textChanged, this, &FictionTextEdit::refresh);
                 return;
             }
 
@@ -1081,7 +1098,6 @@ void FictionTextEdit::refresh() {
 
                 }
             }
-            connect(this, &QTextEdit::textChanged, this, &FictionTextEdit::refresh);
         }
     }
     // to be used in next FictionTextEdit::refresh
@@ -1093,6 +1109,7 @@ void FictionTextEdit::refresh() {
 }
 
 void FictionTextEdit::mouseMoveEvent(QMouseEvent *event) {
+    qDebug() << "FictionTextEdit::mouseMoveEvent";
     lastMousePos = event->pos();
 
     emit hideWiki();
@@ -1102,7 +1119,7 @@ void FictionTextEdit::mouseMoveEvent(QMouseEvent *event) {
 }
 
 void FictionTextEdit::readBlock() {
-    
+    qDebug() << "FictionTextEdit::readBlock";
     // Get cursor at mouse position
     QTextCursor cursor = cursorForPosition(lastMousePos);
     QTextBlock block = cursor.block();
@@ -1169,7 +1186,7 @@ void FictionTextEdit::readBlock() {
                     // For all other characters, use the next character's position plus margin
                     nextX = line.cursorToX(relativePos + 1);
                 }
-                qDebug() << "-x" << x << "-nextX" << nextX;
+
                 // Create rectangle for this character
                 QRectF charRect(
                     blockPos.x() + x,
@@ -1180,7 +1197,6 @@ void FictionTextEdit::readBlock() {
 
                 // Only add non-zero width rectangles
                 rects.append(charRect);
-                qDebug() << "  charRect" << charRect;
             }
 
             // Now merge rectangles that are on the same line
@@ -1225,5 +1241,6 @@ void FictionTextEdit::readBlock() {
 }
 
 void FictionTextEdit::showContextMenu(const QPoint &pos) {
+    qDebug() << "FictionTextEdit::showContextMenu";
     ContextMenuUtil::showContextMenu(this, pos);
 }
