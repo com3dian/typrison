@@ -95,11 +95,11 @@ void CountdownTimerWidget::setupUI()
     timeFont.setPointSize(24);
     timeFont.setWeight(QFont::Thin);
     timeLabel->setFont(timeFont);
-    
+
     // Add widgets to layout (text label first, then time label)
     mainLayout->addWidget(textLabel);
     mainLayout->addWidget(timeLabel);
-    
+
     // Set fixed size
     setFixedSize(180, 90);
     
@@ -112,7 +112,9 @@ void CountdownTimerWidget::showWidget()
 {
     setVisible(true);
     raise(); // Bring to front
-    updateDisplay();
+    if (!isUnlimited) {
+        updateDisplay();
+    }
 }
 
 void CountdownTimerWidget::hideWidget()
@@ -130,8 +132,8 @@ void CountdownTimerWidget::startCountdown(int seconds) {
         isActive = false;
         
         // Update text label to indicate unlimited mode
-        textLabel->setText("This challenge has unlimited time");
-        timeLabel->setText(""); // Clear the time label since we're using textLabel for the message
+        textLabel->setText("Take your time");
+        timeLabel->setText("Unlimited");
         timeLabel->setStyleSheet("color: #ffffff;");
         
         // Reset opacity and show widget
@@ -163,6 +165,8 @@ void CountdownTimerWidget::startCountdown(int seconds) {
         
         fadeAnimation->start();
         return;
+    } else {
+        textLabel->setText("Challenge starts in:");
     }
     
     // Normal countdown mode
@@ -244,10 +248,10 @@ void CountdownTimerWidget::updateDisplay()
         // Calculate progress from 0.0 (start) to 1.0 (end)
         double progress = 1.0 - (double)remainingSeconds / (double)totalSeconds;
         
-        // Target color #E0715C (224, 113, 92)
-        int targetRed = 224;
-        int targetGreen = 113;
-        int targetBlue = 92;
+        // Target color #E0715C (232, 74, 44)
+        int targetRed = 232;
+        int targetGreen = 74;
+        int targetBlue = 44;
         
         // Interpolate color from white (255, 255, 255) to #E0715C (224, 113, 92)
         int red = (int)(255 + (targetRed - 255) * progress);
@@ -279,8 +283,6 @@ void CountdownTimerWidget::showEvent(QShowEvent *event)
     QWidget::showEvent(event);
     // Font sizes are fixed, no dynamic adjustment
 }
-
-
 
 QString CountdownTimerWidget::formatTime(int seconds) const
 {

@@ -99,7 +99,7 @@ void ProgressBorderWidget::updateTimerProgress() {
 
 void ProgressBorderWidget::updateTypingProgress(int wordCount) {
     if (targetWordCount > 0) {
-        typingProgressLengthRatio = static_cast<qreal>(wordCount) / targetWordCount;
+        typingProgressLengthRatio = static_cast<qreal>(wordCount) / static_cast<qreal>(targetWordCount);
     } else {
         typingProgressLengthRatio = 0.0;
     }
@@ -321,7 +321,7 @@ void ProgressBorderWidget::paintEvent(QPaintEvent *event) {
 
     QColor chaserColorEnd = QColor("#804337");
     QColor chaserColorBackground = QColor("#2C2C2C"); // Color the line fades to
-    QColor chaserColorStart = QColor("#E0715C");
+    QColor chaserColorStart = QColor("#E84A2C");
 
     QColor progressColorEnd = QColor("#3F7050"); 
     QColor progressColorBackground = QColor("#2C2C2C"); // Color the line fades to
