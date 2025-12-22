@@ -1,5 +1,6 @@
 #include "fictiontextedit.h"
 #include "utils/contextmenuutil.h"
+#include <QSet>
 
 FictionTextEdit::FictionTextEdit(QWidget *parent,
                                  ProjectManager *projectManager,
@@ -1137,7 +1138,7 @@ void FictionTextEdit::readBlock() {
     
     // Get the block's position in document coordinates
     QPointF blockPos = document()->documentLayout()->blockBoundingRect(block).topLeft();
-    QList<QString> matchedWikiKeys;
+    QSet<QString> matchedWikiKeysSet;  // Use QSet to ensure unique keys
 
     // Iterate through the matches
     for (const QString& wikiKey : matches.keys()) {
@@ -1225,12 +1226,14 @@ void FictionTextEdit::readBlock() {
                 QRectF hitRect = adjustedRect.adjusted(-5, -5, 5, 5);
                 
                 if (hitRect.contains(lastMousePos)) {
-                    matchedWikiKeys.append(wikiKey);
+                    matchedWikiKeysSet.insert(wikiKey);  // Use insert() to ensure uniqueness
                     
                 }
             }
         }
     }
+    // Convert QSet to QList for getContentByKeys()
+    QList<QString> matchedWikiKeys = matchedWikiKeysSet.values();
     // Here you can trigger your tooltip or other UI elements
     QString fullMatchedContent = projectManager->getContentByKeys(matchedWikiKeys);
     if (fullMatchedContent.isEmpty()) {
