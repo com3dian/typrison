@@ -13,6 +13,7 @@ FictionTextEdit::FictionTextEdit(QWidget *parent,
     , previousCursorPosition(0)
     , previousDocumentText("")
     , isInit(true)
+    , scrollAnimation(nullptr)
 {
     QPalette palette = this->palette();
     palette.setColor(QPalette::Highlight, QColor("#84e0a5"));
@@ -148,7 +149,6 @@ QTextCursor FictionTextEdit::applyCharFormatting(QTextCursor &cursor, bool inser
 
 QTextCursor FictionTextEdit::applyCharFormatting4NextBlock(QTextCursor &cursor)
 {
-    qDebug() << "FictionTextEdit::applyCharFormatting4NextBlock";
     bool isFirstBlock = cursor.blockNumber() == 0;
 
     QTextCharFormat charFormat = cursor.charFormat();  // Get current char format
@@ -851,7 +851,18 @@ void FictionTextEdit::updateFocusBlock() {
     if (previousCenteredBlock.isValid()) {
         int position = checkVisibleCenterBlock(previousCenteredBlock);
         if (position == 0) {
-
+            // Block is at center, but check if it's actually highlighted
+            // Get the first character's foreground color to check current state
+            QTextCursor cursor(previousCenteredBlock);
+            cursor.movePosition(QTextCursor::StartOfBlock);
+            cursor.movePosition(QTextCursor::NextCharacter, QTextCursor::KeepAnchor);
+            QColor currentColor = cursor.charFormat().foreground().color();
+            
+            // If the block is grey instead of white, re-apply formatting to highlight it
+            if (currentColor != Qt::white && currentColor.name() == "#656565") {
+                applyBlockFormatting(previousCenteredBlock);
+            }
+            
             return; // The previous centered block is still close enough, no need to update
         }
     }
@@ -908,6 +919,8 @@ void FictionTextEdit::activateSniperMode() {
     QColor customColor("#656565"); // gray color
     changeGlobalTextColor(customColor); // Change all text to gray
 
+    previousCursorBlock = textCursor().block();
+
     // Update the previously centered block to the new highlight color
     updateFocusBlock();
 
@@ -918,6 +931,16 @@ void FictionTextEdit::activateSniperMode() {
 void FictionTextEdit::deactivateSniperMode() {
     isSniperMode = false;
     changeGlobalTextColor(Qt::white); // Change all text to white
+
+    // Reset previousCursorBlock to invalid state
+    previousCursorBlock = QTextBlock();
+    
+    // Stop any ongoing scroll animation
+    if (scrollAnimation) {
+        scrollAnimation->stop();
+        delete scrollAnimation;
+        scrollAnimation = nullptr;
+    }
 
     disconnect(verticalScrollBar(), &QScrollBar::valueChanged, this, &FictionTextEdit::updateFocusBlock);
 }
@@ -997,6 +1020,14 @@ void FictionTextEdit::clearSearch() {
 */
 void FictionTextEdit::updateCursorPosition() {
     QTextCursor cursor = this->textCursor();
+    if (isSniperMode) {
+        QTextBlock currentBlock = cursor.block();
+        // Only auto-scroll if there's no active selection to avoid disrupting multi-line selections
+        if (previousCursorBlock.isValid() && currentBlock != previousCursorBlock && !cursor.hasSelection()) {
+            this->scrollToCenter(currentBlock);
+        }
+        previousCursorBlock = currentBlock;
+    }
     previousCursorPosition = cursor.position();
 }
 
@@ -1120,7 +1151,6 @@ void FictionTextEdit::mouseMoveEvent(QMouseEvent *event) {
 }
 
 void FictionTextEdit::readBlock() {
-    qDebug() << "FictionTextEdit::readBlock";
     // Get cursor at mouse position
     QTextCursor cursor = cursorForPosition(lastMousePos);
     QTextBlock block = cursor.block();
@@ -1244,6 +1274,52 @@ void FictionTextEdit::readBlock() {
 }
 
 void FictionTextEdit::showContextMenu(const QPoint &pos) {
-    qDebug() << "FictionTextEdit::showContextMenu";
     ContextMenuUtil::showContextMenu(this, pos);
+}
+
+void FictionTextEdit::scrollToCenter(const QTextBlock &block) {
+    if (!block.isValid()) {
+        return;
+    }
+
+    QScrollBar *vScrollBar = verticalScrollBar();
+    if (!vScrollBar) {
+        return;
+    }
+
+    // Calculate target scroll position
+    QRectF blockRect = document()->documentLayout()->blockBoundingRect(block);
+    int blockMiddle = static_cast<int>(blockRect.top() + blockRect.height() / 2);
+    QRect visibleRect = viewport()->rect();
+    int centerY = visibleRect.top() * 0.58 + visibleRect.bottom() * 0.42;
+    int targetScrollValue = blockMiddle - centerY;
+    
+    // Clamp to valid range
+    targetScrollValue = qBound(vScrollBar->minimum(), targetScrollValue, vScrollBar->maximum());
+    
+    // Get current scroll position
+    int currentScrollValue = vScrollBar->value();
+    
+    // If already at target, no need to animate
+    if (currentScrollValue == targetScrollValue) {
+        return;
+    }
+    
+    // Stop any existing animation
+    if (scrollAnimation) {
+        scrollAnimation->stop();
+        delete scrollAnimation;
+    }
+    
+    scrollAnimation = new QPropertyAnimation(vScrollBar, "value", this);
+    scrollAnimation->setDuration(250);
+    scrollAnimation->setStartValue(currentScrollValue);
+    scrollAnimation->setEndValue(targetScrollValue);
+    scrollAnimation->setEasingCurve(QEasingCurve::InOutCubic);
+    
+    // Connect to finished signal to ensure correct coloring after animation completes
+    connect(scrollAnimation, &QPropertyAnimation::finished, this, &FictionTextEdit::updateFocusBlock);
+    
+    scrollAnimation->start(QAbstractAnimation::DeleteWhenStopped);
+    scrollAnimation = nullptr;
 }

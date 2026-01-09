@@ -32,6 +32,7 @@
 #include <QFuture>
 #include <QFutureWatcher>
 #include <qtconcurrentrun.h>
+#include <QPropertyAnimation>
 
 
 class FictionTextEdit : public QTextEdit
@@ -109,11 +110,13 @@ private:
     void onTextChanged();
     void updateCursorPosition();
     void readBlock();
+    void scrollToCenter(const QTextBlock &block);
     // void toggleCursorVisibility();
 
     int globalFontSize;
     QTextBlock previousCenteredBlock;
     QTextBlock newCenteredBlock;
+    QTextBlock previousCursorBlock;
     
     FictionHighlighter* highlighter;
     int matchStringIndex;
@@ -132,6 +135,9 @@ private:
     QFutureWatcher<int> *blockSearchWatcher;
     QFuture<int> blockSearchFuture;
     QTimer *blockSearchThrottleTimer;
+    
+    // Smooth scrolling animation
+    QPropertyAnimation *scrollAnimation;
 
 };
 
