@@ -26,6 +26,7 @@
 #include "popups/prisonerdialog.h"
 #include "popups/escapeprisonerdialog.h"
 #include "popups/failedprisonerdialog.h"
+#include "popups/instructionframe.h"
 
 
 class FictionViewTab : public BaseTextEditTab {
@@ -63,6 +64,7 @@ private:
     bool blockDeactivationEscape = false;
     QRegularExpression alphabeticRegex;
     QRegularExpression cjkRegex;
+    InstructionFrame *instructionFrame = nullptr;
 
     void setupTextEdit(const QString &content);
     void setupScrollBar();
@@ -79,6 +81,8 @@ private:
     void escapePrisonerMode();
     void showWikiFunc(const QString &wikiContent, QPoint lastMousePos);
     void hideWikiFunc();
+    void showInstructionPopup(const QString &text, QWidget *button);
+    void hideInstructionPopup();
 
 signals:
     void showWikiAt(const QString &wikiContent, QPoint lastMousePos);
@@ -90,6 +94,7 @@ signals:
 // In the protected or public section of your class declaration:
 protected:
     void resizeEvent(QResizeEvent *event) override;
+    bool eventFilter(QObject *obj, QEvent *event) override;
 };
 
 #endif // FICTIONVIEWTAB_H

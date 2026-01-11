@@ -81,6 +81,7 @@ set(PROJECT_SOURCES
     functionbar/trafficbutton.h
     utils/ahocorasick.cpp
     utils/ahocorasick.h
+    utils/colorpalette.h
     utils/hoverbutton.h
     utils/fictionhighlighter.cpp
     utils/fictionhighlighter.h
@@ -89,6 +90,8 @@ set(PROJECT_SOURCES
     popups/imageframe.h
     popups/wikiframe.h
     popups/wikiframe.cpp
+    popups/instructionframe.h
+    popups/instructionframe.cpp
     popups/savemessagebox.h
     popups/savemessagebox.cpp
     popups/prisonerdialog.h

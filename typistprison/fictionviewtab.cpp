@@ -6,6 +6,8 @@ mot
 
 #include "fictionviewtab.h"
 #include <QTabWidget>
+#include <QEnterEvent>
+#include <QEvent>
 
 
 FictionViewTab::FictionViewTab(const QString &content,
@@ -164,6 +166,10 @@ FictionViewTab::FictionViewTab(const QString &content,
     connect(textEdit, &FictionTextEdit::showWikiAt, this, &FictionViewTab::showWikiFunc);
     connect(textEdit, &FictionTextEdit::hideWiki, this, &FictionViewTab::hideWikiFunc);
     connect(prisonerButton, &QPushButton::clicked, this, &FictionViewTab::activatePrisonerMode);
+    
+    // Install event filters for hover detection on buttons
+    prisonerButton->installEventFilter(this);
+    sniperButton->installEventFilter(this);
 }
 
 void FictionViewTab::setupTextEdit(const QString &content) {
@@ -523,8 +529,39 @@ void FictionViewTab::escapePrisonerMode() {
 
     // if goal not reached, clear the progress in prisoner mode
     if (!goalWasReached) {
+        // Skip sniper mode deactivation - load() will reset colors anyway
+        // Just set the flag to avoid expensive changeGlobalTextColor()
+        bool wasSniperMode = textEdit->isSniperMode;
+        if (wasSniperMode) {
+            textEdit->isSniperMode = false; // Prevent sniper formatting during load
+        }
+        
+        // Disconnect textChanged signals to prevent infinite loop during load
+        disconnect(textEdit, &FictionTextEdit::textChanged, this, &FictionViewTab::editContent);
+        disconnect(textEdit, &FictionTextEdit::textChanged, this, &FictionViewTab::updateWordcount);
+        
+        // Block ALL signals during load to prevent any signal processing
+        textEdit->setUpdatesEnabled(false);
+        textEdit->blockSignals(true);
         textEdit->load(prisonerInitialContent);
+        textEdit->blockSignals(false);
+        textEdit->setUpdatesEnabled(true);
+        
+        // Properly deactivate sniper mode after load if it was active
+        if (wasSniperMode) {
+            textEdit->deactivateSniperMode();
+        }
+        
+        // Reconnect textChanged signals
+        connect(textEdit, &FictionTextEdit::textChanged, this, &FictionViewTab::editContent);
+        connect(textEdit, &FictionTextEdit::textChanged, this, &FictionViewTab::updateWordcount);
     }
+    
+    // Always update word count after escaping prisoner mode
+    // Update cached content first, then force word count update
+    oldTextContent = ""; // Clear cache to force update
+    updateWordcount();
+    oldTextContent = textEdit->toPlainText(); // Set cache after update
 }
 
 QString FictionViewTab::getTextContent() const {
@@ -560,4 +597,87 @@ void FictionViewTab::showWikiFunc(const QString &wikiContent, QPoint lastMousePo
 void FictionViewTab::hideWikiFunc() {
     qDebug() << "FictionViewTab::hideWikiFunc";
     emit hideWiki();
+}
+
+void FictionViewTab::showInstructionPopup(const QString &text, QWidget *button) {
+    // Create InstructionFrame if it doesn't exist
+    if (!instructionFrame) {
+        instructionFrame = new InstructionFrame(this);
+    }
+
+    // Set the instruction text
+    instructionFrame->setText(text);
+
+    // Get button position in global coordinates
+    QPoint buttonGlobalPos = button->mapToGlobal(QPoint(0, 0));
+    QPoint buttonPos = this->mapFromGlobal(buttonGlobalPos);
+    
+    // Position the frame below the button with a small offset
+    QPoint popupPos = buttonPos + QPoint(0, button->height() + 8);
+
+    // Ensure the frame stays within window bounds
+    QSize frameSize = instructionFrame->sizeHint();
+    QSize windowSize = this->size();
+
+    // Adjust x-coordinate if needed
+    if (popupPos.x() + frameSize.width() > windowSize.width()) {
+        popupPos.setX(windowSize.width() - frameSize.width());
+    }
+    if (popupPos.x() < 0) {
+        popupPos.setX(0);
+    }
+
+    // Adjust y-coordinate if needed (show above button if below doesn't fit)
+    if (popupPos.y() + frameSize.height() > windowSize.height()) {
+        popupPos.setY(buttonPos.y() - frameSize.height() - 8);
+    }
+    if (popupPos.y() < 0) {
+        popupPos.setY(0);
+    }
+
+    instructionFrame->move(popupPos);
+    instructionFrame->show();
+    instructionFrame->raise();
+}
+
+void FictionViewTab::hideInstructionPopup() {
+    if (instructionFrame) {
+        instructionFrame->hide();
+    }
+}
+
+bool FictionViewTab::eventFilter(QObject *obj, QEvent *event) {
+    if (obj == prisonerButton) {
+        QString instructionText;
+        if (event->type() == QEvent::Enter) {
+            if (this->isInPrisonerMode()) {
+                instructionText = 
+                    "Escape Prisoner Mode: Unsaved progress will be lost "
+                    "if you haven't completed your goal.";
+            } else {
+                instructionText = 
+                    "Prisoner Mode: Your progress will be saved first, "
+                    "then the editor locks. Set a word goal and/or time "
+                    "limit. Unlock by completing the challenge.";
+            }
+            
+            showInstructionPopup(instructionText, prisonerButton);
+            return false; // Let the event continue to HoverButton
+        } else if (event->type() == QEvent::Leave) {
+            hideInstructionPopup();
+            return false;
+        }
+    } else if (obj == sniperButton) {
+        if (event->type() == QEvent::Enter) {
+            QString instructionText = 
+                "Sniper Mode: Highlights your current paragraph and centers it.";
+            showInstructionPopup(instructionText, sniperButton);
+            return false; // Let the event continue to HoverButton
+        } else if (event->type() == QEvent::Leave) {
+            hideInstructionPopup();
+            return false;
+        }
+    }
+    
+    return QWidget::eventFilter(obj, event);
 }
