@@ -2,7 +2,7 @@
 
 
 ![Static Badge](https://img.shields.io/badge/typrison-84E0A5)
-![Issues](https://img.shields.io/github/issues/com3dian/typistprison?color=%23F5BD4E)
+![Issues](https://img.shields.io/github/issues/com3dian/typrison?color=%23F5BD4E)
 
 
 ## 🚀 Features
