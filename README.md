@@ -1,6 +1,8 @@
-<img width="13276" height="4012" alt="banner(1)" src="https://github.com/user-attachments/assets/ff035634-ce43-43f2-b6a9-ae2a0f791958" />
+<img width="13276" height="4012" alt="banner" src="https://github.com/user-attachments/assets/73c6dd76-c10a-49d9-9275-9a8279459b5a" />
 
 
+![Static Badge](https://img.shields.io/badge/typrison-84E0A5)
+![Issues](https://img.shields.io/github/issues/com3dian/typistprison?color=%23F5BD4E)
 
 
 ## 🚀 Features
