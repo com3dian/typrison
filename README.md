@@ -7,12 +7,12 @@
 
 
 ## 🚀 Features
-- **Intuitive Editor**: Clean and distraction-free interface for focused writing.
-- **Markdown Formatting**: Easily style text with Markdown—bold, italics, lists, and more.
-- **Cross-Platform**: Runs smoothly on Linux, Windows, and macOS.
-- **Offline Ready**: No internet? No problem. Write anywhere, anytime.
+- Intuitive Editor: Distraction-free design built for **deep focus**.
+- Markdown Formatting: Fast, flexible styling with `Markdown`.
+- Cross-Platform: Seamless experience on `Linux`, `Windows`, and `macOS`.
+- Offline Ready: Create without limits—no internet required.
 
-<img width="895" alt="Screenshot 2024-11-24 at 14 11 17" src="https://github.com/user-attachments/assets/e0001a94-4992-4985-98be-7893d041baf2">
+<img width="5100" height="1292" alt="New_Project" src="https://github.com/user-attachments/assets/3062f937-3ece-4f51-ae74-c25da0c644f4" />
 
 
 ## 📥 Installation
