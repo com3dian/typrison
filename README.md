@@ -12,7 +12,7 @@
 - Cross-Platform: Seamless experience on `Linux`, `Windows`, and `macOS`.
 - Offline Ready: Create without limits—no internet required.
 
-<img width="5100" height="1292" alt="New_Project" src="https://github.com/user-attachments/assets/3062f937-3ece-4f51-ae74-c25da0c644f4" />
+<img width="2100" height="1700" alt="New_Project" src="https://github.com/user-attachments/assets/a7dffb85-6a85-4f75-a109-4e0abf722003" />
 
 
 ## 📥 Installation
