@@ -44,8 +44,9 @@ jobs:
     
     - name: Deploy Qt dependencies and create DMG
       run: |
-        macdeployqt "${{ steps.find_app.outputs.app_path }}" -dmg
-        DMG_PATH="${{ steps.find_app.outputs.app_path }%.app}.dmg"
+        APP_PATH="${{ steps.find_app.outputs.app_path }}"
+        macdeployqt "$APP_PATH" -dmg
+        DMG_PATH="${APP_PATH%.app}.dmg"
         echo "DMG created at: $DMG_PATH"
         ls -lh "$(dirname $DMG_PATH)"
     
