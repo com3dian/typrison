@@ -1,0 +1,51 @@
+<RCC>
+    <qresource prefix="/">
+        <file>icons/typrison_icon.png</file>
+        <file>icons/angle_down.png</file>
+        <file>icons/angle_right.png</file>
+        <file>icons/sidebar_silent.png</file>
+        <file>icons/sidebar_hover.png</file>
+        <file>icons/sidebar_clicked.png</file>
+        <file>icons/sidebar_triggerred.png</file>
+        <file>icons/tab_close.png</file>
+        <file>icons/tab_hover.png</file>
+        <file>icons/tab_clicked.png</file>
+        <file>icons/newfile_silent.png</file>
+        <file>icons/newfile_hover.png</file>
+        <file>icons/newfolder_silent.png</file>
+        <file>icons/newfolder_hover.png</file>
+        <file>icons/refresh_silent.png</file>
+        <file>icons/refresh_hover.png</file>
+        <file>icons/search_silent.png</file>
+        <file>icons/search_hover.png</file>
+        <file>icons/search_clicked.png</file>
+        <file>icons/clearsearch_silent.png</file>
+        <file>icons/clearsearch_hover.png</file>
+        <file>icons/clearsearch_clicked.png</file>
+        <file>icons/emptyicon.png</file>
+        <file>icons/folder.png</file>
+        <file>icons/file.png</file>
+        <file>icons/md_icon.png</file>
+        <file>icons/cell_icon.png</file>
+        <file>icons/txt_icon.png</file>
+        <file>icons/toggle_menu.png</file>
+        <file>icons/toggle_menu_back.png</file>
+        <file>icons/prisoner.png</file>
+        <file>icons/sniper.png</file>
+        <file>icons/right_arrow.png</file>
+        <file>icons/right_arrow_hover.png</file>
+        <file>icons/right_arrow_green.png</file>
+        <file>icons/escape_icon.png</file>
+        <file>icons/windowclose.png</file>
+        <file>icons/windowminimize.png</file>
+        <file>icons/windowmaximize.png</file>
+        <file>icons/wikifile_icon.png</file>
+        <file>icons/*_icon.png</file>
+        <file>icons/save_file.png</file>
+        <file>icons/save_file_hover.png</file>
+        <file>icons/discard_file.png</file>
+        <file>icons/discard_file_hover.png</file>
+
+
+    </qresource>
+</RCC>

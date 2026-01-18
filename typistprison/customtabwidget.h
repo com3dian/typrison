@@ -7,56 +7,69 @@
 #include <QStylePainter>
 #include <QPainterPath>
 #include <QStyleOptionTab>
+#include <QHBoxLayout>
+#include <QPoint>
 
+#include "projectmanager.h"
+#include "prisonermanager.h"
 
-class CustomTabBar : public QTabBar {
-// protected:
-    // void paintEvent(QPaintEvent* event) override {
-    //     QStylePainter painter(this);
-    //     for (int i = 0; i < count(); ++i) {
-    //         QStyleOptionTab option;
-    //         initStyleOption(&option, i);
-
-    //         option.rect = option.rect.adjusted(0, 0, 0, -1); // Remove the bottom border
-
-    //         // Set custom shape for the tab with only upper corners rounded
-    //         QRect rect = option.rect;
-    //         QPainterPath path;
-    //         path.moveTo(rect.bottomLeft());
-    //         path.lineTo(rect.topLeft() - QPointF(0, 4));
-    //         path.arcTo(rect.topLeft().x(), rect.topLeft().y(), 8, 8, 180, -90);
-    //         path.lineTo(rect.topRight() - QPointF(4, 0));
-    //         path.arcTo(rect.topRight().x() - 8, rect.topRight().y(), 8, 8, 90, -90);
-    //         path.lineTo(rect.bottomRight());
-    //         // path.lineTo(rect.bottomLeft());
-
-    //         painter.setClipPath(path);
-
-    //         painter.drawControl(QStyle::CE_TabBarTabShape, option);
-    //         painter.drawControl(QStyle::CE_TabBarTabLabel, option);
-    //         }
-    // }
-};
 
 class CustomTabWidget : public QTabWidget {
     Q_OBJECT
 
 public:
-    CustomTabWidget(QWidget *parent = nullptr);
-    void createNewTab(const QString &content, const QString &tabName);
+    CustomTabWidget(QWidget *parent = nullptr, ProjectManager *projectManager = nullptr, PrisonerManager *prisonerManager = nullptr);
+
+    void createNewTab(const QString &filePath, bool isUntitled = false, int tabIndex = -1);
+    void createFictionTab(const QString &filePath = "", bool isUntitled = true, int tabIndex = -1);
+    void createPlainTextTab(const QString &filePath = "", bool isUntitled = true, int tabIndex = -1);
+    void createMarkdownTab(const QString &filePath = "", bool isUntitled = true, int tabIndex = -1);
     void switchToFictionView();
-    // void switchToEditorView();
+
+public slots:
+    void updateTabTitle(const QString &fileName);
+    void updateFileType(const QString &previousFileName);
+    void closeWindowIfNoTabs(int index);
+    void onTabCloseRequested(int index, bool needAsking = true);
+    void handleFileDeleted(const QString &deletedFilePath);
+    void handleFileRenamed(const QString &originalFilePath, const QString &newFilePath);
+    void showImageAt(const QString &imagePath, QPoint lastMousePos);
+    void hideImage();
+    void showWikiAt(const QString &wikiContent, QPoint lastMousePos);
+    void hideWiki();
+    void activatePrisonerModeFunc(int timeLimit, int wordGoal);
+    void deactivatePrisonerModeFunc();
 
 private:
+    int untitledCount;
+    ProjectManager *projectManager;
+    PrisonerManager *prisonerManager;
+
     void setupTabWidget();
     void setupTabBar();
     void setupStyles();
-    void closeWindowIfNoTabs(int index);
     void applyFictionViewStyles(QTextEdit *textEdit);
     void applyEditorViewStyles(QTextEdit *textEdit);
+    int checkIdenticalOpenedFile(const QString &givenFilePath);
+
+private slots:
+    
+    
+protected:
+    void tabInserted(int index) override;
 
 signals:
     void lastTabClosed();
+    void tabInsertedSignal(int index, const QString &label);
+    void tabClosedFromSyncedTabWidgetSignal(int index);
+    void updatedTabTitleSignal(int currentIndex, QString newTitle);
+    void tabActivatedSignal(int index);
+    void showImageAtSignal(const QString &imagePath, QPoint lastMousePos);
+    void hideImageSignal();
+    void showWikiAtSignal(const QString &imagePath, QPoint lastMousePos);
+    void hideWikiSignal();
+    void activatePrisonerModeSignal(int timeLimit, int wordGoal);
+    void deactivatePrisonerModeSignal();
 
 };
 
