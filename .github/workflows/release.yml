@@ -1,0 +1,169 @@
+name: Build Release Packages
+
+on:
+  release:
+    types: [created, published]
+  workflow_dispatch: # Allows manual trigger for testing
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v4
+      with:
+        version: '6.8.0'
+        host: 'mac'
+        target: 'desktop'
+        arch: 'clang_64'
+        modules: 'qtcharts qtnetworkauth'
+        cache: true
+    
+    - name: Configure CMake
+      run: |
+        cd typistprison
+        mkdir build-release
+        cd build-release
+        cmake -DCMAKE_BUILD_TYPE=Release ..
+    
+    - name: Build
+      run: |
+        cd typistprison/build-release
+        cmake --build . --config Release
+    
+    - name: Find .app bundle
+      id: find_app
+      run: |
+        APP_PATH=$(find typistprison/build-release -name "*.app" -type d | head -n 1)
+        echo "app_path=$APP_PATH" >> $GITHUB_OUTPUT
+        echo "Found app at: $APP_PATH"
+    
+    - name: Deploy Qt dependencies and create DMG
+      run: |
+        macdeployqt "${{ steps.find_app.outputs.app_path }}" -dmg
+        DMG_PATH="${{ steps.find_app.outputs.app_path }%.app}.dmg"
+        echo "DMG created at: $DMG_PATH"
+        ls -lh "$(dirname $DMG_PATH)"
+    
+    - name: Rename DMG with version
+      id: rename_dmg
+      run: |
+        APP_PATH="${{ steps.find_app.outputs.app_path }}"
+        DMG_PATH="${APP_PATH%.app}.dmg"
+        VERSION="${GITHUB_REF#refs/tags/}"
+        if [ -z "$VERSION" ] || [ "$VERSION" == "$GITHUB_REF" ]; then
+          VERSION="dev"
+        fi
+        NEW_NAME="TypistPrison-${VERSION}-macOS.dmg"
+        mv "$DMG_PATH" "typistprison/build-release/$NEW_NAME"
+        echo "dmg_name=$NEW_NAME" >> $GITHUB_OUTPUT
+        echo "dmg_path=typistprison/build-release/$NEW_NAME" >> $GITHUB_OUTPUT
+    
+    - name: Upload DMG artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: macos-dmg
+        path: ${{ steps.rename_dmg.outputs.dmg_path }}
+    
+    - name: Upload DMG to release
+      if: github.event_name == 'release'
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: ${{ steps.rename_dmg.outputs.dmg_path }}
+        asset_name: ${{ steps.rename_dmg.outputs.dmg_name }}
+        asset_content_type: application/x-apple-diskimage
+
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v4
+      with:
+        version: '6.8.0'
+        host: 'windows'
+        target: 'desktop'
+        arch: 'win64_msvc2019_64'
+        modules: 'qtcharts qtnetworkauth'
+        cache: true
+    
+    - name: Setup MSVC
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x64
+    
+    - name: Configure CMake
+      run: |
+        cd typistprison
+        mkdir build-release
+        cd build-release
+        cmake -DCMAKE_BUILD_TYPE=Release -G "Ninja" ..
+    
+    - name: Build
+      run: |
+        cd typistprison/build-release
+        cmake --build . --config Release
+    
+    - name: Find EXE
+      id: find_exe
+      shell: bash
+      run: |
+        EXE_PATH=$(find typistprison/build-release -name "*.exe" -type f | head -n 1)
+        echo "exe_path=$EXE_PATH" >> $GITHUB_OUTPUT
+        echo "Found exe at: $EXE_PATH"
+        EXE_DIR=$(dirname "$EXE_PATH")
+        echo "exe_dir=$EXE_DIR" >> $GITHUB_OUTPUT
+    
+    - name: Deploy Qt dependencies
+      shell: bash
+      run: |
+        windeployqt "${{ steps.find_exe.outputs.exe_path }}"
+        echo "Deployed files:"
+        ls -lh "${{ steps.find_exe.outputs.exe_dir }}"
+    
+    - name: Create distributable package
+      id: create_package
+      shell: bash
+      run: |
+        VERSION="${GITHUB_REF#refs/tags/}"
+        if [ -z "$VERSION" ] || [ "$VERSION" == "$GITHUB_REF" ]; then
+          VERSION="dev"
+        fi
+        PACKAGE_NAME="TypistPrison-${VERSION}-Windows"
+        PACKAGE_DIR="typistprison/build-release/$PACKAGE_NAME"
+        mkdir -p "$PACKAGE_DIR"
+        cp -r "${{ steps.find_exe.outputs.exe_dir }}"/* "$PACKAGE_DIR/"
+        
+        # Create zip
+        cd typistprison/build-release
+        7z a "${PACKAGE_NAME}.zip" "$PACKAGE_NAME"
+        
+        echo "package_name=${PACKAGE_NAME}.zip" >> $GITHUB_OUTPUT
+        echo "package_path=typistprison/build-release/${PACKAGE_NAME}.zip" >> $GITHUB_OUTPUT
+    
+    - name: Upload Windows package artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-exe
+        path: ${{ steps.create_package.outputs.package_path }}
+    
+    - name: Upload package to release
+      if: github.event_name == 'release'
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: ${{ steps.create_package.outputs.package_path }}
+        asset_name: ${{ steps.create_package.outputs.package_name }}
+        asset_content_type: application/zip

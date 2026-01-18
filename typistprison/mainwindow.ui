@@ -13,79 +13,21 @@
   <property name="windowTitle">
    <string>MainWindow</string>
   </property>
+  <property name="styleSheet">
+   <string notr="true"/>
+  </property>
+  <property name="toolButtonStyle">
+   <enum>Qt::ToolButtonStyle::ToolButtonIconOnly</enum>
+  </property>
+  <property name="tabShape">
+   <enum>QTabWidget::TabShape::Rounded</enum>
+  </property>
+  <property name="unifiedTitleAndToolBarOnMac">
+   <bool>true</bool>
+  </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QHBoxLayout" name="horizontalLayout"/>
   </widget>
-  <widget class="QMenuBar" name="menubar">
-   <property name="geometry">
-    <rect>
-     <x>0</x>
-     <y>0</y>
-     <width>800</width>
-     <height>22</height>
-    </rect>
-   </property>
-   <property name="cursor">
-    <cursorShape>ArrowCursor</cursorShape>
-   </property>
-   <property name="toolTipDuration">
-    <number>0</number>
-   </property>
-   <property name="autoFillBackground">
-    <bool>false</bool>
-   </property>
-   <property name="nativeMenuBar">
-    <bool>true</bool>
-   </property>
-   <widget class="QMenu" name="menuFile">
-    <property name="cursor">
-     <cursorShape>ArrowCursor</cursorShape>
-    </property>
-    <property name="title">
-     <string>File</string>
-    </property>
-    <addaction name="actionNew_File"/>
-    <addaction name="actionOpen_File"/>
-    <addaction name="actionOpen_Folder"/>
-    <addaction name="actionSave"/>
-    <addaction name="actionSave_As"/>
-    <addaction name="actionSave_All"/>
-    <addaction name="separator"/>
-    <addaction name="actionQuit"/>
-   </widget>
-   <widget class="QMenu" name="menuEdit">
-    <property name="title">
-     <string>Edit</string>
-    </property>
-    <addaction name="actionUndo"/>
-    <addaction name="separator"/>
-    <addaction name="actionCopy"/>
-    <addaction name="actionPaste"/>
-   </widget>
-   <widget class="QMenu" name="menuView">
-    <property name="title">
-     <string>View</string>
-    </property>
-    <addaction name="actionSIde_Bar"/>
-    <addaction name="separator"/>
-    <addaction name="actionEditor_View"/>
-    <addaction name="actionFiction_View"/>
-   </widget>
-   <widget class="QMenu" name="menuProj">
-    <property name="title">
-     <string>Project</string>
-    </property>
-    <addaction name="actionOpen"/>
-    <addaction name="actionSwitch"/>
-    <addaction name="separator"/>
-    <addaction name="actionTest"/>
-   </widget>
-   <addaction name="menuFile"/>
-   <addaction name="menuEdit"/>
-   <addaction name="menuView"/>
-   <addaction name="menuProj"/>
-  </widget>
-  <widget class="QStatusBar" name="statusbar"/>
   <action name="actionNew_File">
    <property name="text">
     <string>New File</string>
@@ -148,7 +90,7 @@
   </action>
   <action name="actionFiction_View">
    <property name="text">
-    <string>Fiction View</string>
+    <string>Typist Prison</string>
    </property>
   </action>
   <action name="actionCopy">
@@ -171,7 +113,7 @@
     <string>Switch</string>
    </property>
   </action>
-  <action name="actionOpen">
+  <action name="actionOpenProject">
    <property name="text">
     <string>Open Project...</string>
    </property>
