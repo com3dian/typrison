@@ -1,4 +1,7 @@
-set(CMAKE_PREFIX_PATH "/Users/com3dian/Qt/6.8.0/macos")
+# Set Qt path for local development (will be overridden in CI/CD)
+if(NOT DEFINED ENV{Qt6_DIR} AND NOT DEFINED CMAKE_PREFIX_PATH)
+    set(CMAKE_PREFIX_PATH "/Users/com3dian/Qt/6.8.0/macos")
+endif()
 
 cmake_minimum_required(VERSION 3.5)
 
