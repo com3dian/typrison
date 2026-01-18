@@ -636,13 +636,13 @@ void FictionViewTab::showInstructionPopup(const QString &text, QWidget *button) 
     }
 
     instructionFrame->move(popupPos);
-    instructionFrame->show();
     instructionFrame->raise();
+    FadeAnimationUtil::fadeIn(instructionFrame, 150);
 }
 
 void FictionViewTab::hideInstructionPopup() {
     if (instructionFrame) {
-        instructionFrame->hide();
+        FadeAnimationUtil::fadeOut(instructionFrame, 150);
     }
 }
 

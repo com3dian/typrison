@@ -9,6 +9,7 @@
 #include <QWidgetAction>
 #include <QGraphicsDropShadowEffect>
 #include <QTimer>
+#include <QPropertyAnimation>
 #include <functional>
 #include "../functionbar/menubutton.h"
 
@@ -108,8 +109,22 @@ public:
             "}"
         );
         
-        // Show the menu at the cursor position
+        // Set initial opacity to 0 for fade-in effect
+        menu->setWindowOpacity(0.0);
+        
+        // Create fade-in animation
+        QPropertyAnimation *fadeIn = new QPropertyAnimation(menu, "windowOpacity");
+        fadeIn->setDuration(100);
+        fadeIn->setStartValue(0.0);
+        fadeIn->setEndValue(1.0);
+        fadeIn->setEasingCurve(QEasingCurve::InOutQuad);
+        fadeIn->start(QAbstractAnimation::DeleteWhenStopped);
+        
+        // Show the menu at the cursor position (this blocks until menu closes)
         menu->exec(textEdit->mapToGlobal(pos));
+        
+        // Note: fade-out would happen here, but menu->exec() blocks until closed
+        // The menu will disappear immediately on close, which is acceptable behavior
         
         // Clean up
         menu->deleteLater();

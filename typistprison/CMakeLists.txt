@@ -87,6 +87,8 @@ set(PROJECT_SOURCES
     utils/fictionhighlighter.h
     utils/closebuttonwidget.cpp
     utils/closebuttonwidget.h
+    utils/fadeanimationutil.cpp
+    utils/fadeanimationutil.h
     popups/imageframe.h
     popups/wikiframe.h
     popups/wikiframe.cpp

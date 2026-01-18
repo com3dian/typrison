@@ -75,13 +75,13 @@ void FolderTreeViewWidget::resizeEvent(QResizeEvent* event)
 
 void FolderTreeViewWidget::enterEvent(QEnterEvent* event)
 {
-    overlayWidget->hide();
+    FadeAnimationUtil::fadeOut(overlayWidget, 150);
     QWidget::enterEvent(event);
 }
 
 void FolderTreeViewWidget::leaveEvent(QEvent* event)
 {
-    overlayWidget->show();
+    FadeAnimationUtil::fadeIn(overlayWidget, 150);
     QWidget::leaveEvent(event);
 }
 

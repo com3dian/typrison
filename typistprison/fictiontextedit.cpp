@@ -427,19 +427,8 @@ void FictionTextEdit::insertFromMimeData(const QMimeData *source)
 
 void FictionTextEdit::changeFontSize(int delta) {
     qDebug() << "FictionTextEdit::changeFontSize";
-    // Find the most centered block
+    // Find the paragraph (block) that's currently in the center
     QTextBlock centerBlock = findBlockClosestToCenter();
-    QRectF centerBlockRect = document()->documentLayout()->blockBoundingRect(centerBlock);
-    int centerBlockTop = centerBlockRect.top();
-    int centerBlockBottom = centerBlockRect.bottom();
-    int centerBlockMiddle = static_cast<int>(centerBlockTop + (centerBlockBottom - centerBlockTop) / 2);
-    // // Get the scroll position to calculate the distance from the top of the document
-    // int scrollPosition = verticalScrollBar()->value();
-
-    // // Calculate the relative position of the center block
-    // int relativePosition = centerBlockMiddle + scrollPosition;
-    // qDebug() << "relativePosition" << relativePosition;
-
 
     highlighter->changeFontSize(delta);
     // set default font
@@ -472,15 +461,18 @@ void FictionTextEdit::changeFontSize(int delta) {
         updateFocusBlock();
     }
 
-    // After changing the font size, scroll to keep the old center block in view
-    QRectF newCenterBlockRect = document()->documentLayout()->blockBoundingRect(centerBlock);
-    int newCenterBlockTop = newCenterBlockRect.top();
-    int newCenterBlockBottom = newCenterBlockRect.bottom();
-    int newCenterBlockMiddle = static_cast<int>(newCenterBlockTop + (newCenterBlockBottom - newCenterBlockTop) / 2);
-
-    // Calculate the relative position of the center block
-    int halfViewportHeight = (viewport()->height() - 256) / 2;
-    verticalScrollBar()->setValue(newCenterBlockMiddle - halfViewportHeight);
+    // After changing the font size, center the same paragraph again
+    // This is simpler than math-based positioning and maintains reading context
+    if (centerBlock.isValid()) {
+        QRectF newCenterBlockRect = document()->documentLayout()->blockBoundingRect(centerBlock);
+        int newCenterBlockMiddle = static_cast<int>(newCenterBlockRect.top() + newCenterBlockRect.height() / 2);
+        
+        // Calculate the center Y position of the viewport (accounting for top margin)
+        int viewportCenterY = (viewport()->height() - 256) / 2;
+        
+        // Scroll so the block's middle aligns with the viewport center
+        verticalScrollBar()->setValue(newCenterBlockMiddle - viewportCenterY);
+    }
 }
 
 /*  

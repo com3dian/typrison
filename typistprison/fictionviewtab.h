@@ -27,6 +27,7 @@
 #include "popups/escapeprisonerdialog.h"
 #include "popups/failedprisonerdialog.h"
 #include "popups/instructionframe.h"
+#include "utils/fadeanimationutil.h"
 
 
 class FictionViewTab : public BaseTextEditTab {

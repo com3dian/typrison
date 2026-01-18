@@ -23,6 +23,7 @@
 #include <QNetworkAccessManager>
 
 #include "customtabwidget.h"
+#include "utils/fadeanimationutil.h"
 #include "ui_mainwindow.h"
 #include "customstyle.h"
 #include "foldertreeviewwidget.h"
@@ -95,6 +96,7 @@ private:
     QPushButton *button1;
     QPushButton *button2;
     QPushButton *menuToggleButton;
+    QPushButton *currentMenuButton = nullptr;  // Track which button's menu is showing
     QFrame *existingFrame = nullptr;
     QFrame *subMenuFrame = nullptr;  // New submenu frame for hover functionality
     FunctionBar *functionBar;

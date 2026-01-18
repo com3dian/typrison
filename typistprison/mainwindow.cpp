@@ -589,7 +589,7 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
                 QPoint posInMainWindow = this->mapFromGlobal(mouseEvent->globalPos());
                 
                 if (!contextMenuFrame->geometry().contains(posInMainWindow)) {
-                    contextMenuFrame->hide();
+                    FadeAnimationUtil::fadeOut(contextMenuFrame, 100);
                     return true;
                 }
             }
@@ -627,14 +627,32 @@ menu buttons are the (file, project) buttons in (top left) function bar.
 */
 void MainWindow::handleMouseEnterMenuButton(QPushButton *button) {
     qDebug() << "MainWindow::handleMouseEnterMenuButton";
+    
+    // If the menu for this button is already open, do nothing
+    if (existingFrame && currentMenuButton == button) {
+        qDebug() << "Menu already open for this button, skipping";
+        return;
+    }
+    
+    // Check if we need to switch from an existing frame
+    bool needsDelay = (existingFrame != nullptr);
+    
     // Remove any existing frame if present.
     if (existingFrame) {
-        existingFrame->setParent(nullptr);
-        existingFrame->deleteLater();
-        existingFrame = nullptr;
+        // Capture the old frame in a local variable to avoid affecting the new frame
+        QFrame *oldFrame = existingFrame;
+        existingFrame = nullptr;  // Clear the member variable immediately
+        currentMenuButton = nullptr;  // Clear the current menu button
+        
+        // Fade out and delete the old menu
+        FadeAnimationUtil::fadeOutWithCallback(oldFrame, [oldFrame]() {
+            oldFrame->setParent(nullptr);
+            oldFrame->deleteLater();
+        }, 100);
     }
 
     if (subMenuFrame) {
+        // Just hide immediately since we're deleting it
         subMenuFrame->setVisible(false);
         subMenuFrame->setParent(nullptr);
         subMenuFrame->deleteLater();
@@ -643,6 +661,7 @@ void MainWindow::handleMouseEnterMenuButton(QPushButton *button) {
 
     // Create a new frame for the hovered button.
     QFrame *newFrame = new QFrame(this);
+    newFrame->hide(); // Hide IMMEDIATELY to prevent any flash during setup
     newFrame->setFrameShape(QFrame::NoFrame); // No default frame margins
     newFrame->setStyleSheet(
         "QFrame {   "
@@ -684,7 +703,7 @@ void MainWindow::handleMouseEnterMenuButton(QPushButton *button) {
         // Connect hover signals for submenu
         connect(frameButtonNew, &MenuButton::hovered, this, [this, frameButtonNew]() {
             if (subMenuFrame && subMenuFrame->isVisible()) {
-                subMenuFrame->setVisible(false);
+                FadeAnimationUtil::fadeOut(subMenuFrame, 100);
             }
 
             // Create submenu frame on hover
@@ -774,8 +793,8 @@ void MainWindow::handleMouseEnterMenuButton(QPushButton *button) {
                 -marginTop - 1));
             subMenuFrame->move(this->mapFromGlobal(buttonTopRight));
             
-            // Show the submenu
-            subMenuFrame->show();
+            // Show the submenu with fast fade
+            FadeAnimationUtil::fadeIn(subMenuFrame, 100);
         });
         
         connect(frameButtonNew, &MenuButton::notHovered, this, [this]() {
@@ -783,7 +802,7 @@ void MainWindow::handleMouseEnterMenuButton(QPushButton *button) {
             QTimer::singleShot(200, this, [this]() {
                 // Check if mouse is over the submenu
                 if (subMenuFrame && !subMenuFrame->underMouse()) {
-                    subMenuFrame->hide();
+                    FadeAnimationUtil::fadeOut(subMenuFrame, 100);
                 }
             });
         });
@@ -863,18 +882,28 @@ void MainWindow::handleMouseEnterMenuButton(QPushButton *button) {
     QPoint buttonBottomLeft = button->mapToGlobal(QPoint(0, button->height() + 14));
     newFrame->move(this->mapFromGlobal(buttonBottomLeft));
 
-    // Show the new frame and save it in the member variable.
-    newFrame->setVisible(true);
-    existingFrame = newFrame;
-
-    // Create and configure the drop shadow effect
+    // Create and configure the drop shadow effect BEFORE fade
+    // (FadeAnimationUtil will preserve it during fade animation)
     QGraphicsDropShadowEffect *shadow = new QGraphicsDropShadowEffect;
     shadow->setBlurRadius(24);   // Increase for a softer, larger shadow
     shadow->setColor(QColor("#1F2020")); // Shadow color
     shadow->setOffset(0, 0);     // Zero offset to get shadow on all sides
-
-    // Apply the effect to your frame
     newFrame->setGraphicsEffect(shadow);
+
+    // Show the new frame with fast fade and save it in the member variable.
+    existingFrame = newFrame;
+    currentMenuButton = button;  // Track which button owns this menu
+    
+    // If switching from old frame, delay the fade-in slightly to avoid overlap flash
+    if (needsDelay) {
+        QTimer::singleShot(50, this, [this]() {
+            if (existingFrame) {
+                FadeAnimationUtil::fadeIn(existingFrame, 100);
+            }
+        });
+    } else {
+        FadeAnimationUtil::fadeIn(existingFrame, 100);
+    }
 
     connect(this, &MainWindow::mouseClick,
         functionBar, &FunctionBar::closeMenuBar,
@@ -888,10 +917,11 @@ menu buttons are the (file, project) buttons in (top left) function bar.
 void MainWindow::handleFocusLeaveMenuButton() {
     qDebug() << "MainWindow::handleFocusLeaveMenuButton";
     if (existingFrame) {
-        existingFrame->setVisible(false);
+        FadeAnimationUtil::fadeOut(existingFrame, 100);
+        currentMenuButton = nullptr;  // Clear the tracked button
     }
     if (subMenuFrame) {
-        subMenuFrame->setVisible(false);
+        FadeAnimationUtil::fadeOut(subMenuFrame, 100);
     }
 }
 
@@ -944,6 +974,7 @@ void MainWindow::showMarkdownImage(const QString &imagePath, QPoint lastMousePos
         }
     }
 }
+
 
 /*
 Show a floating window that displays image.
@@ -1022,22 +1053,23 @@ void MainWindow::displayImage(const QPixmap &pixmap, QPoint lastMousePos) {
 
         imageFrame->move(popupPos);
 
-        // Create and configure the drop shadow effect
-        QGraphicsDropShadowEffect *shadow = new QGraphicsDropShadowEffect;
-        shadow->setBlurRadius(24);   // Increase for a softer, larger shadow
-        shadow->setColor(QColor("#1F2020"));    // Shadow color
-        shadow->setOffset(0, 0);     // Zero offset to get shadow on all sides
+        // Create and configure the drop shadow effect if not already present
+        if (!imageFrame->graphicsEffect()) {
+            QGraphicsDropShadowEffect *shadow = new QGraphicsDropShadowEffect;
+            shadow->setBlurRadius(24);   // Increase for a softer, larger shadow
+            shadow->setColor(QColor("#1F2020"));    // Shadow color
+            shadow->setOffset(0, 0);     // Zero offset to get shadow on all sides
+            imageFrame->setGraphicsEffect(shadow);
+        }
 
-        // Apply the effect to your frame
-        imageFrame->setGraphicsEffect(shadow);
-
-        imageFrame->show();
+        // Fade in the image frame
+        FadeAnimationUtil::fadeIn(imageFrame, 200);
 }
 
 void MainWindow::hideMarkdownImage() {
     qDebug() << "MainWindow::hideMarkdownImage";
     if (imageFrame) {
-        imageFrame->hide();  // Hide the frame
+        FadeAnimationUtil::fadeOut(imageFrame, 200);
     }
 }
 
@@ -1084,12 +1116,14 @@ void MainWindow::showWiki(const QString &wikiContent, QPoint lastMousePos) {
     }
 
     wikiFrame->move(popupPos);
-    wikiFrame->show();
+    
+    // Fade in the wiki frame
+    FadeAnimationUtil::fadeIn(wikiFrame, 200);
 }
 
 void MainWindow::hideWiki() {
     if (wikiFrame) {
-        wikiFrame->hide();
+        FadeAnimationUtil::fadeOut(wikiFrame, 200);
     }
 }
 
@@ -1178,9 +1212,9 @@ void MainWindow::showContextMenu(const QStringList &options, const QModelIndex &
     // Size the frame appropriately
     contextMenuFrame->adjustSize();
     
-    // Show the frame
+    // Show the frame with fast fade
     contextMenuFrame->raise();
-    contextMenuFrame->show();
+    FadeAnimationUtil::fadeIn(contextMenuFrame, 100);
     
     // Install event filter to close the menu when clicked outside
     qApp->installEventFilter(this);
@@ -1188,9 +1222,9 @@ void MainWindow::showContextMenu(const QStringList &options, const QModelIndex &
 
 void MainWindow::handleContextMenuSelection(const QString &action) {
     qDebug() << "MainWindow::handleContextMenuSelection";
-    // Hide the context menu frame
+    // Hide the context menu frame with fast fade
     if (contextMenuFrame) {
-        contextMenuFrame->hide();
+        FadeAnimationUtil::fadeOut(contextMenuFrame, 100);
     }
     
     // Forward the action to the folder tree view

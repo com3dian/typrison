@@ -8,6 +8,7 @@
 #include <QGraphicsDropShadowEffect>
 #include <QCursor>
 #include "projectmanager.h"
+#include "utils/fadeanimationutil.h"
 
 class FolderTreeViewWidget : public QWidget {
     Q_OBJECT
