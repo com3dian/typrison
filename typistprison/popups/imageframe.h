@@ -3,9 +3,11 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QVBoxLayout>
+#include <QMovie>
 
 class ImageFrame : public QFrame {
     QPixmap pixmap;
+    QMovie *movie = nullptr;
 
 public:
     explicit ImageFrame(QWidget *parent = nullptr) : QFrame(parent) {
@@ -13,8 +15,40 @@ public:
         setStyleSheet("background-color: transparent;"); // no border in CSS
     }
 
+    ~ImageFrame() {
+        if (movie) {
+            movie->stop();
+            delete movie;
+        }
+    }
+
     void setImage(const QPixmap &image) {
+        if (movie) {
+            movie->stop();
+            delete movie;
+            movie = nullptr;
+        }
         pixmap = image;
+        update();
+    }
+
+    void setMovie(const QString &filePath) {
+        if (movie) {
+            movie->stop();
+            delete movie;
+            movie = nullptr;
+        }
+
+        movie = new QMovie(filePath, QByteArray(), this);
+        if (movie->isValid()) {
+            connect(movie, &QMovie::frameChanged, this, [this](int) {
+                update();
+            });
+            movie->start();
+        } else {
+            delete movie;
+            movie = nullptr;
+        }
         update();
     }
 
@@ -63,7 +97,13 @@ protected:
         // --- Content (no rounding) ---
         const QRect contentRect = rect().adjusted(margin, margin, -margin, -margin);
         paintCheckerboard(p, contentRect, 10);
-        if (!pixmap.isNull()) {
+        
+        if (movie && movie->isValid() && movie->state() == QMovie::Running) {
+            QPixmap currentFrame = movie->currentPixmap();
+            if (!currentFrame.isNull()) {
+                 p.drawPixmap(QRectF(contentRect), currentFrame, QRectF(currentFrame.rect()));
+            }
+        } else if (!pixmap.isNull()) {
             // draw scaled image exactly over the checkerboard
             p.drawPixmap(QRectF(contentRect), pixmap, QRectF(pixmap.rect()));
         }

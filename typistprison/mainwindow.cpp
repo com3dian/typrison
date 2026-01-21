@@ -968,7 +968,7 @@ void MainWindow::showMarkdownImage(const QString &imagePath, QPoint lastMousePos
         // Handle local file path
         QPixmap pixmap(imagePath);
         if (!pixmap.isNull()) {
-            displayImage(pixmap, lastMousePos);
+            displayImage(pixmap, lastMousePos, imagePath);
         } else {
             qDebug() << "Failed to load local image:" << imagePath;
         }
@@ -988,7 +988,7 @@ Show a floating window that displays image.
 
 max size for image frame is [800, 600]
 */
-void MainWindow::displayImage(const QPixmap &pixmap, QPoint lastMousePos) {
+void MainWindow::displayImage(const QPixmap &pixmap, QPoint lastMousePos, const QString &imagePath) {
     qDebug() << "MainWindow::displayImage";
     // Define maximum dimensions for the scaled image
     const int MAX_WIDTH = 800;
@@ -1014,20 +1014,21 @@ void MainWindow::displayImage(const QPixmap &pixmap, QPoint lastMousePos) {
             scaleFactor = qMin(0.2, qMin(widthRatio, heightRatio));
         }
 
-        // Scale the image with the calculated factor
-        QPixmap scaledPixmap = pixmap.scaled(originalSize * scaleFactor, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-
         // Create ImageFrame if it doesn't exist
         if (!imageFrame) {
             imageFrame = new ImageFrame(this);
         }
 
-        // Set the image to the frame
-        imageFrame->setImage(scaledPixmap);
+        // Set the image or movie to the frame
+        if (!imagePath.isEmpty() && QFileInfo(imagePath).suffix().toLower() == "gif") {
+            imageFrame->setMovie(imagePath);
+        } else {
+            imageFrame->setImage(pixmap);
+        }
 
         // Resize the frame to fit the scaled image
-        QSize imageSize = scaledPixmap.size();
-        imageFrame->resize(imageSize);
+        // Note: ImageFrame::paintEvent will scale the content to fit the frame size
+        imageFrame->resize(scaledSize);
 
         // Position the frame relative to the mouse position with offset
         QPoint popupPos = this->mapFromGlobal(lastMousePos - QPoint(8, 8));
@@ -1036,16 +1037,16 @@ void MainWindow::displayImage(const QPixmap &pixmap, QPoint lastMousePos) {
         QSize windowSize = this->size();
 
         // Adjust x-coordinate if needed
-        if (popupPos.x() + imageSize.width() > windowSize.width() - EDGE_PADDING) {
-            popupPos.setX(windowSize.width() - imageSize.width() - EDGE_PADDING);
+        if (popupPos.x() + scaledSize.width() > windowSize.width() - EDGE_PADDING) {
+            popupPos.setX(windowSize.width() - scaledSize.width() - EDGE_PADDING);
         }
         if (popupPos.x() < EDGE_PADDING) {
             popupPos.setX(EDGE_PADDING);
         }
 
         // Adjust y-coordinate if needed
-        if (popupPos.y() + imageSize.height() > windowSize.height() - EDGE_PADDING) {
-            popupPos.setY(windowSize.height() - imageSize.height() - EDGE_PADDING);
+        if (popupPos.y() + scaledSize.height() > windowSize.height() - EDGE_PADDING) {
+            popupPos.setY(windowSize.height() - scaledSize.height() - EDGE_PADDING);
         }
         if (popupPos.y() < TOP_PADDING) {
             popupPos.setY(TOP_PADDING);
