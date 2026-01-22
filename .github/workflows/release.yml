@@ -334,7 +334,6 @@ jobs:
     
     - name: Upload package to release
       if: github.event_name == 'release' && steps.create_package.outputs.package_path != '' && github.event.release.upload_url != ''
-      shell: bash
       continue-on-error: false
       uses: actions/upload-release-asset@v1
       env:
