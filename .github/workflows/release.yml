@@ -24,6 +24,20 @@ jobs:
         modules: 'qtcharts qtnetworkauth'
         cache: true
     
+    - name: Verify Qt installation
+      run: |
+        echo "Checking Qt installation..."
+        echo "Qt6_DIR: $Qt6_DIR"
+        echo "CMAKE_PREFIX_PATH: $CMAKE_PREFIX_PATH"
+        if [ -n "$Qt6_DIR" ] && [ -d "$Qt6_DIR" ]; then
+          echo "Qt6_DIR exists: $Qt6_DIR"
+          ls -la "$Qt6_DIR" || true
+        fi
+        if [ -n "$CMAKE_PREFIX_PATH" ]; then
+          echo "CMAKE_PREFIX_PATH: $CMAKE_PREFIX_PATH"
+          find "$CMAKE_PREFIX_PATH" -name "Qt6Config.cmake" 2>/dev/null | head -1 || echo "Qt6Config.cmake not found in CMAKE_PREFIX_PATH"
+        fi
+    
     - name: Configure CMake
       run: |
         cd typistprison
@@ -34,18 +48,41 @@ jobs:
         echo "Qt6_DIR: $Qt6_DIR"
         echo "CMAKE_PREFIX_PATH: $CMAKE_PREFIX_PATH"
         echo "Running CMake configuration..."
+        
+        # Build CMake command
+        CMAKE_CMD="cmake -DCMAKE_BUILD_TYPE=Release -G \"Unix Makefiles\""
+        
+        # Add Qt path if available
         if [ -n "$Qt6_DIR" ]; then
-          cmake -DCMAKE_BUILD_TYPE=Release \
-                -DQt6_DIR="$Qt6_DIR" \
-                -G "Unix Makefiles" \
-                .. 2>&1 | tee cmake_output.log
+          CMAKE_CMD="$CMAKE_CMD -DQt6_DIR=\"$Qt6_DIR\""
+          echo "Using Qt6_DIR: $Qt6_DIR"
+        elif [ -n "$CMAKE_PREFIX_PATH" ]; then
+          CMAKE_CMD="$CMAKE_CMD -DCMAKE_PREFIX_PATH=\"$CMAKE_PREFIX_PATH\""
+          echo "Using CMAKE_PREFIX_PATH: $CMAKE_PREFIX_PATH"
         else
-          cmake -DCMAKE_BUILD_TYPE=Release \
-                -G "Unix Makefiles" \
-                .. 2>&1 | tee cmake_output.log
+          echo "Warning: No Qt path found in environment!"
         fi
+        
+        CMAKE_CMD="$CMAKE_CMD .."
+        echo "CMake command: $CMAKE_CMD"
+        
+        # Run CMake and capture output
+        eval $CMAKE_CMD 2>&1 | tee cmake_output.log
+        CMAKE_EXIT_CODE=${PIPESTATUS[0]}
+        
+        if [ $CMAKE_EXIT_CODE -ne 0 ]; then
+          echo "ERROR: CMake configuration failed with exit code $CMAKE_EXIT_CODE"
+          cat cmake_output.log
+          exit 1
+        fi
+        
         echo "CMake configuration completed. Checking for Makefile..."
-        ls -la | grep -E "(Makefile|CMakeCache)" || (echo "Warning: No Makefile or CMakeCache found!" && cat cmake_output.log && exit 1)
+        if [ ! -f "Makefile" ]; then
+          echo "ERROR: Makefile not found after CMake configuration!"
+          cat cmake_output.log
+          exit 1
+        fi
+        echo "Makefile found successfully!"
     
     - name: Build
       run: |
@@ -138,15 +175,39 @@ jobs:
         env | grep -i qt || true
         echo "Qt6_DIR: $Qt6_DIR"
         echo "CMAKE_PREFIX_PATH: $CMAKE_PREFIX_PATH"
+        
+        # Build CMake command
+        CMAKE_CMD="cmake -DCMAKE_BUILD_TYPE=Release -G \"Ninja\""
+        
+        # Add Qt path if available
         if [ -n "$Qt6_DIR" ]; then
-          cmake -DCMAKE_BUILD_TYPE=Release \
-                -DQt6_DIR="$Qt6_DIR" \
-                -G "Ninja" ..
-        else
-          cmake -DCMAKE_BUILD_TYPE=Release -G "Ninja" ..
+          CMAKE_CMD="$CMAKE_CMD -DQt6_DIR=\"$Qt6_DIR\""
+          echo "Using Qt6_DIR: $Qt6_DIR"
+        elif [ -n "$CMAKE_PREFIX_PATH" ]; then
+          CMAKE_CMD="$CMAKE_CMD -DCMAKE_PREFIX_PATH=\"$CMAKE_PREFIX_PATH\""
+          echo "Using CMAKE_PREFIX_PATH: $CMAKE_PREFIX_PATH"
         fi
+        
+        CMAKE_CMD="$CMAKE_CMD .."
+        echo "CMake command: $CMAKE_CMD"
+        
+        # Run CMake
+        eval $CMAKE_CMD 2>&1 | tee cmake_output.log
+        CMAKE_EXIT_CODE=${PIPESTATUS[0]}
+        
+        if [ $CMAKE_EXIT_CODE -ne 0 ]; then
+          echo "ERROR: CMake configuration failed with exit code $CMAKE_EXIT_CODE"
+          cat cmake_output.log
+          exit 1
+        fi
+        
         echo "CMake configuration completed. Checking for build files..."
-        ls -la | grep -E "(build.ninja|CMakeCache)" || echo "Warning: No build files found!"
+        if [ ! -f "build.ninja" ]; then
+          echo "ERROR: build.ninja not found after CMake configuration!"
+          cat cmake_output.log
+          exit 1
+        fi
+        echo "build.ninja found successfully!"
     
     - name: Build
       shell: bash
@@ -251,15 +312,41 @@ jobs:
         env | grep -i qt || true
         echo "Qt6_DIR: $Qt6_DIR"
         echo "CMAKE_PREFIX_PATH: $CMAKE_PREFIX_PATH"
+        
+        # Build CMake command
+        CMAKE_CMD="cmake -DCMAKE_BUILD_TYPE=Release -G \"Ninja\""
+        
+        # Add Qt path if available
         if [ -n "$Qt6_DIR" ]; then
-          cmake -DCMAKE_BUILD_TYPE=Release \
-                -DQt6_DIR="$Qt6_DIR" \
-                -G "Ninja" ..
+          CMAKE_CMD="$CMAKE_CMD -DQt6_DIR=\"$Qt6_DIR\""
+          echo "Using Qt6_DIR: $Qt6_DIR"
+        elif [ -n "$CMAKE_PREFIX_PATH" ]; then
+          CMAKE_CMD="$CMAKE_CMD -DCMAKE_PREFIX_PATH=\"$CMAKE_PREFIX_PATH\""
+          echo "Using CMAKE_PREFIX_PATH: $CMAKE_PREFIX_PATH"
         else
-          cmake -DCMAKE_BUILD_TYPE=Release -G "Ninja" ..
+          echo "Warning: No Qt path found in environment!"
         fi
+        
+        CMAKE_CMD="$CMAKE_CMD .."
+        echo "CMake command: $CMAKE_CMD"
+        
+        # Run CMake and capture output
+        eval $CMAKE_CMD 2>&1 | tee cmake_output.log
+        CMAKE_EXIT_CODE=${PIPESTATUS[0]}
+        
+        if [ $CMAKE_EXIT_CODE -ne 0 ]; then
+          echo "ERROR: CMake configuration failed with exit code $CMAKE_EXIT_CODE"
+          cat cmake_output.log
+          exit 1
+        fi
+        
         echo "CMake configuration completed. Checking for build files..."
-        ls -la | grep -E "(build.ninja|CMakeCache)" || echo "Warning: No build files found!"
+        if [ ! -f "build.ninja" ]; then
+          echo "ERROR: build.ninja not found after CMake configuration!"
+          cat cmake_output.log
+          exit 1
+        fi
+        echo "build.ninja found successfully!"
     
     - name: Build
       run: |

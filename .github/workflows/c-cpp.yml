@@ -8,14 +8,97 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-    - name: make
-      run: make
-    - name: make check
-      run: make check
-    - name: make distcheck
-      run: make distcheck
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          ninja-build \
+          libgl1-mesa-dev \
+          libglib2.0-dev \
+          libxkbcommon-x11-0 \
+          libxkbcommon-dev
+    
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v4
+      with:
+        version: '6.8.0'
+        host: 'linux'
+        target: 'desktop'
+        arch: 'gcc_64'
+        modules: 'qtcharts qtnetworkauth'
+        cache: true
+    
+    - name: Verify Qt installation
+      run: |
+        echo "Qt6_DIR: $Qt6_DIR"
+        echo "CMAKE_PREFIX_PATH: $CMAKE_PREFIX_PATH"
+        if [ -n "$CMAKE_PREFIX_PATH" ]; then
+          echo "Checking for Qt6Config.cmake..."
+          find "$CMAKE_PREFIX_PATH" -name "Qt6Config.cmake" 2>/dev/null | head -1 || echo "Not found in CMAKE_PREFIX_PATH"
+        fi
+    
+    - name: Configure CMake
+      run: |
+        cd typistprison
+        mkdir -p build
+        cd build
+        
+        # Build CMake command
+        CMAKE_CMD="cmake -DCMAKE_BUILD_TYPE=Release -G \"Ninja\""
+        
+        # Add Qt path if available
+        if [ -n "$Qt6_DIR" ]; then
+          CMAKE_CMD="$CMAKE_CMD -DQt6_DIR=\"$Qt6_DIR\""
+          echo "Using Qt6_DIR: $Qt6_DIR"
+        elif [ -n "$CMAKE_PREFIX_PATH" ]; then
+          CMAKE_CMD="$CMAKE_CMD -DCMAKE_PREFIX_PATH=\"$CMAKE_PREFIX_PATH\""
+          echo "Using CMAKE_PREFIX_PATH: $CMAKE_PREFIX_PATH"
+        fi
+        
+        CMAKE_CMD="$CMAKE_CMD .."
+        echo "Running: $CMAKE_CMD"
+        
+        # Run CMake
+        eval $CMAKE_CMD 2>&1 | tee cmake_output.log
+        CMAKE_EXIT_CODE=${PIPESTATUS[0]}
+        
+        if [ $CMAKE_EXIT_CODE -ne 0 ]; then
+          echo "ERROR: CMake configuration failed with exit code $CMAKE_EXIT_CODE"
+          cat cmake_output.log
+          exit 1
+        fi
+        
+        # Verify build files were created
+        if [ ! -f "build.ninja" ]; then
+          echo "ERROR: build.ninja not found after CMake configuration!"
+          cat cmake_output.log
+          exit 1
+        fi
+        echo "CMake configuration successful!"
+    
+    - name: Build
+      run: |
+        cd typistprison/build
+        cmake --build . --config Release
+        echo "Build completed successfully!"
+    
+    - name: Verify executable
+      run: |
+        cd typistprison/build
+        if [ -f "typistprison" ]; then
+          echo "Executable found: typistprison"
+          file typistprison
+          ls -lh typistprison
+        else
+          echo "ERROR: Executable not found!"
+          find . -name "typistprison" -type f -executable
+          exit 1
+        fi
