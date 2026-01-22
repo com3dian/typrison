@@ -15,6 +15,7 @@
 #include <QTextBrowser>
 #include <QFileDialog>
 #include <QClipboard>
+#include <QGuiApplication>
 #include <QLabel>
 
 FolderTreeViewWidget::FolderTreeViewWidget(QWidget *parent,
