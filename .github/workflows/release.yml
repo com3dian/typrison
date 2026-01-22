@@ -294,11 +294,11 @@ jobs:
       uses: jurplel/install-qt-action@v4
       id: install-qt
       with:
-        version: '6.7.0'
+        version: '6.5.3'
         host: 'linux'
         target: 'desktop'
         arch: 'gcc_64'
-        cache: true
+        cache: false
     
     - name: Configure CMake
       run: |
