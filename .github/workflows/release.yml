@@ -10,9 +10,43 @@ on:
         required: false
 
 jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'release'
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      release_id: ${{ steps.create_release.outputs.id }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Get version
+      id: get_version
+      run: |
+        VERSION="${GITHUB_REF#refs/tags/}"
+        if [ -z "$VERSION" ] || [ "$VERSION" == "$GITHUB_REF" ]; then
+          VERSION="${{ github.event.inputs.version || 'dev' }}"
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Version: $VERSION"
+    
+    - name: Create release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.get_version.outputs.version }}
+        release_name: "TypistPrison ${{ steps.get_version.outputs.version }}"
+        body: "Automated release build"
+        draft: false
+        prerelease: false
+
   build-macos:
     runs-on: macos-latest
     continue-on-error: false
+    needs: [create-release]
+    if: always() && (needs.create-release.result == 'success' || needs.create-release.result == 'skipped')
     
     steps:
     - name: Checkout code
@@ -161,12 +195,12 @@ jobs:
       continue-on-error: false
     
     - name: Upload DMG to release (action)
-      if: github.event_name == 'release' && steps.rename_dmg.outputs.dmg_path != '' && github.event.release.upload_url != ''
+      if: steps.rename_dmg.outputs.dmg_path != ''
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        upload_url: ${{ github.event.release.upload_url }}
+        upload_url: ${{ github.event.release.upload_url || needs.create-release.outputs.upload_url }}
         asset_path: ${{ steps.rename_dmg.outputs.dmg_path }}
         asset_name: ${{ steps.rename_dmg.outputs.dmg_name }}
         asset_content_type: application/x-apple-diskimage
@@ -174,6 +208,8 @@ jobs:
   build-windows:
     runs-on: windows-latest
     continue-on-error: false
+    needs: [create-release]
+    if: always() && (needs.create-release.result == 'success' || needs.create-release.result == 'skipped')
     
     steps:
     - name: Checkout code
@@ -333,13 +369,13 @@ jobs:
         fi
     
     - name: Upload package to release
-      if: github.event_name == 'release' && steps.create_package.outputs.package_path != '' && github.event.release.upload_url != ''
+      if: steps.create_package.outputs.package_path != ''
       continue-on-error: false
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        upload_url: ${{ github.event.release.upload_url }}
+        upload_url: ${{ github.event.release.upload_url || needs.create-release.outputs.upload_url }}
         asset_path: ${{ steps.create_package.outputs.package_path }}
         asset_name: ${{ steps.create_package.outputs.package_name }}
         asset_content_type: application/zip
@@ -347,6 +383,8 @@ jobs:
   build-linux:
     runs-on: ubuntu-latest
     continue-on-error: false
+    needs: [create-release]
+    if: always() && (needs.create-release.result == 'success' || needs.create-release.result == 'skipped')
     
     steps:
     - name: Checkout code
@@ -568,13 +606,13 @@ jobs:
         fi
     
     - name: Upload package to release
-      if: github.event_name == 'release' && steps.create_package.outputs.package_path != '' && github.event.release.upload_url != ''
+      if: steps.create_package.outputs.package_path != ''
       continue-on-error: false
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        upload_url: ${{ github.event.release.upload_url }}
+        upload_url: ${{ github.event.release.upload_url || needs.create-release.outputs.upload_url }}
         asset_path: ${{ steps.create_package.outputs.package_path }}
         asset_name: ${{ steps.create_package.outputs.package_name }}
         asset_content_type: application/octet-stream
