@@ -416,16 +416,16 @@ jobs:
         chmod +x "$PACKAGE_DIR/run.sh"
         
         # Create README
-        cat > "$PACKAGE_DIR/README.txt" << EOF
-TypistPrison ${VERSION} for Linux
-
-To run:
-  ./run.sh
-
-Or directly:
-  export LD_LIBRARY_PATH=./lib:\$LD_LIBRARY_PATH
-  ./typistprison
-EOF
+        {
+          echo "TypistPrison ${VERSION} for Linux"
+          echo ""
+          echo "To run:"
+          echo "  ./run.sh"
+          echo ""
+          echo "Or directly:"
+          echo "  export LD_LIBRARY_PATH=./lib:\$LD_LIBRARY_PATH"
+          echo "  ./typistprison"
+        } > "$PACKAGE_DIR/README.txt"
         
         # Create tarball
         cd typistprison/build-release
