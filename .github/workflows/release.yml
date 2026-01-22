@@ -148,7 +148,20 @@ jobs:
     
     - name: Upload DMG to release
       if: github.event_name == 'release' && steps.rename_dmg.outputs.dmg_path != '' && github.event.release.upload_url != ''
-      continue-on-error: true
+      run: |
+        echo "Uploading DMG to release..."
+        echo "File path: ${{ steps.rename_dmg.outputs.dmg_path }}"
+        echo "File name: ${{ steps.rename_dmg.outputs.dmg_name }}"
+        echo "Upload URL: ${{ github.event.release.upload_url }}"
+        if [ ! -f "${{ steps.rename_dmg.outputs.dmg_path }}" ]; then
+          echo "ERROR: DMG file does not exist!"
+          exit 1
+        fi
+        ls -lh "${{ steps.rename_dmg.outputs.dmg_path }}"
+      continue-on-error: false
+    
+    - name: Upload DMG to release (action)
+      if: github.event_name == 'release' && steps.rename_dmg.outputs.dmg_path != '' && github.event.release.upload_url != ''
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -242,9 +255,32 @@ jobs:
       id: find_exe
       shell: bash
       run: |
-        EXE_PATH=$(find typistprison/build-release -name "*.exe" -type f | head -n 1)
+        echo "Searching for executable..."
+        echo "All .exe files found:"
+        find typistprison/build-release -name "*.exe" -type f 2>/dev/null
+        
+        # Try to find the actual application executable (not CMake test files)
+        EXE_PATH=$(find typistprison/build-release -name "typistprison.exe" -type f 2>/dev/null | grep -v "CMakeFiles" | head -n 1)
+        if [ -z "$EXE_PATH" ]; then
+          echo "Trying TypistPrison.exe..."
+          EXE_PATH=$(find typistprison/build-release -name "TypistPrison.exe" -type f 2>/dev/null | grep -v "CMakeFiles" | head -n 1)
+        fi
+        if [ -z "$EXE_PATH" ]; then
+          echo "Trying any .exe excluding CMakeFiles..."
+          EXE_PATH=$(find typistprison/build-release -name "*.exe" -type f 2>/dev/null | grep -v "CMakeFiles" | grep -v "CompilerId" | head -n 1)
+        fi
+        
+        if [ -z "$EXE_PATH" ] || [ ! -f "$EXE_PATH" ]; then
+          echo "ERROR: Application executable not found!"
+          echo "Build directory contents:"
+          ls -la typistprison/build-release/ || true
+          find typistprison/build-release -type f -name "*.exe" 2>/dev/null
+          exit 1
+        fi
+        
         echo "exe_path=$EXE_PATH" >> $GITHUB_OUTPUT
-        echo "Found exe at: $EXE_PATH"
+        echo "Found executable at: $EXE_PATH"
+        ls -lh "$EXE_PATH"
         EXE_DIR=$(dirname "$EXE_PATH")
         echo "exe_dir=$EXE_DIR" >> $GITHUB_OUTPUT
     
@@ -281,9 +317,25 @@ jobs:
         name: windows-exe
         path: ${{ steps.create_package.outputs.package_path }}
     
+    - name: Debug Windows release upload
+      if: github.event_name == 'release'
+      shell: bash
+      run: |
+        echo "Event name: ${{ github.event_name }}"
+        echo "Release upload URL: ${{ github.event.release.upload_url }}"
+        echo "Package path: ${{ steps.create_package.outputs.package_path }}"
+        echo "Package name: ${{ steps.create_package.outputs.package_name }}"
+        if [ -f "${{ steps.create_package.outputs.package_path }}" ]; then
+          echo "Package file exists!"
+          ls -lh "${{ steps.create_package.outputs.package_path }}"
+        else
+          echo "ERROR: Package file not found!"
+        fi
+    
     - name: Upload package to release
-      if: github.event_name == 'release' && steps.create_package.outputs.package_path != ''
-      continue-on-error: true
+      if: github.event_name == 'release' && steps.create_package.outputs.package_path != '' && github.event.release.upload_url != ''
+      shell: bash
+      continue-on-error: false
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -502,9 +554,23 @@ jobs:
         name: linux-app
         path: ${{ steps.create_package.outputs.package_path }}
     
+    - name: Debug Linux release upload
+      if: github.event_name == 'release'
+      run: |
+        echo "Event name: ${{ github.event_name }}"
+        echo "Release upload URL: ${{ github.event.release.upload_url }}"
+        echo "Package path: ${{ steps.create_package.outputs.package_path }}"
+        echo "Package name: ${{ steps.create_package.outputs.package_name }}"
+        if [ -f "${{ steps.create_package.outputs.package_path }}" ]; then
+          echo "Package file exists!"
+          ls -lh "${{ steps.create_package.outputs.package_path }}"
+        else
+          echo "ERROR: Package file not found!"
+        fi
+    
     - name: Upload package to release
-      if: github.event_name == 'release' && steps.create_package.outputs.package_path != ''
-      continue-on-error: true
+      if: github.event_name == 'release' && steps.create_package.outputs.package_path != '' && github.event.release.upload_url != ''
+      continue-on-error: false
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
