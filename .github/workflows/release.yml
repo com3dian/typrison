@@ -294,7 +294,7 @@ jobs:
       uses: jurplel/install-qt-action@v4
       id: install-qt
       with:
-        version: '6.8.0'
+        version: '6.7.0'
         host: 'linux'
         target: 'desktop'
         arch: 'gcc_64'
