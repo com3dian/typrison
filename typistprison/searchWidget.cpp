@@ -2,6 +2,7 @@
 #include <QPalette>
 #include <QKeyEvent>
 #include <QScreen>
+#include <QGuiApplication>
 
 SearchWidget::SearchWidget(QWidget *parent)
     : QWidget(parent), isHovered(false), isOnSearch(false), isSearchPrev(false), isSearchLatter(false)
