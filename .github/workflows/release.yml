@@ -813,14 +813,14 @@ jobs:
             chmod +x appimagetool-x86_64.AppImage
             
             # Create AppRun script
-            cat > "$APPDIR/AppRun" << 'APPRUN_EOF'
-#!/bin/bash
-HERE="$(dirname "$(readlink -f "${0}")")"
-export LD_LIBRARY_PATH="${HERE}/usr/lib:${LD_LIBRARY_PATH}"
-export QT_PLUGIN_PATH="${HERE}/usr/plugins:${QT_PLUGIN_PATH}"
-export QML2_IMPORT_PATH="${HERE}/usr/qml:${QML2_IMPORT_PATH}"
-exec "${HERE}/usr/bin/TypistPrison" "$@"
-APPRUN_EOF
+            printf '%s\n' \
+              '#!/bin/bash' \
+              'HERE="$(dirname "$(readlink -f "${0}")")"' \
+              'export LD_LIBRARY_PATH="${HERE}/usr/lib:${LD_LIBRARY_PATH}"' \
+              'export QT_PLUGIN_PATH="${HERE}/usr/plugins:${QT_PLUGIN_PATH}"' \
+              'export QML2_IMPORT_PATH="${HERE}/usr/qml:${QML2_IMPORT_PATH}"' \
+              'exec "${HERE}/usr/bin/TypistPrison" "$@"' \
+              > "$APPDIR/AppRun"
             chmod +x "$APPDIR/AppRun"
             
             # Create AppImage
