@@ -729,9 +729,39 @@ jobs:
         APPIMAGE_NAME="${APP_NAME}-${VERSION}-x86_64.AppImage"
         
         echo "Creating AppImage: $APPIMAGE_NAME"
+        echo "Executable path: $EXE_PATH"
+        echo "Executable dir: $EXE_DIR"
         
         # Change to build directory first
         cd typistprison/build-release
+        
+        # Convert paths to relative after changing directory
+        # EXE_PATH and EXE_DIR are relative to workspace root, so remove the prefix
+        EXE_PATH_REL="${EXE_PATH#typistprison/build-release/}"
+        EXE_DIR_REL="${EXE_DIR#typistprison/build-release/}"
+        
+        # If the paths don't start with the prefix, they might already be relative or absolute
+        if [ "$EXE_PATH_REL" == "$EXE_PATH" ]; then
+          # Try to find the executable in current directory
+          EXE_NAME=$(basename "$EXE_PATH")
+          EXE_PATH_REL=$(find . -name "$EXE_NAME" -type f -executable 2>/dev/null | head -1)
+          if [ -z "$EXE_PATH_REL" ]; then
+            EXE_PATH_REL="$EXE_NAME"
+          fi
+          EXE_DIR_REL="."
+        fi
+        
+        echo "Relative executable path: $EXE_PATH_REL"
+        echo "Relative executable dir: $EXE_DIR_REL"
+        
+        # Verify executable exists
+        if [ ! -f "$EXE_PATH_REL" ]; then
+          echo "ERROR: Executable not found at: $EXE_PATH_REL"
+          echo "Current directory: $(pwd)"
+          echo "Files in current directory:"
+          ls -la
+          exit 1
+        fi
         
         # Download linuxdeploy tools to build directory
         wget -q -O linuxdeploy-x86_64.AppImage https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
@@ -754,8 +784,7 @@ jobs:
         mkdir -p "$APPDIR/usr/share/icons/hicolor/256x256/apps"
         
         # Copy executable
-        EXE_NAME=$(basename "$EXE_PATH")
-        cp "$EXE_PATH" "$APPDIR/usr/bin/$APP_NAME"
+        cp "$EXE_PATH_REL" "$APPDIR/usr/bin/$APP_NAME"
         chmod +x "$APPDIR/usr/bin/$APP_NAME"
         
         # Create .desktop file
@@ -778,16 +807,26 @@ jobs:
         fi
         
         # Copy all dependencies from the deployment directory
-        if [ -d "$EXE_DIR/lib" ]; then
-          cp -r "$EXE_DIR/lib" "$APPDIR/usr/lib/"
+        # Check if lib, plugins, translations exist in the executable directory
+        if [ -d "$EXE_DIR_REL/lib" ]; then
+          cp -r "$EXE_DIR_REL/lib" "$APPDIR/usr/lib/"
+        elif [ -d "lib" ]; then
+          # Also check current directory
+          cp -r "lib" "$APPDIR/usr/lib/"
         fi
-        if [ -d "$EXE_DIR/plugins" ]; then
+        if [ -d "$EXE_DIR_REL/plugins" ]; then
           mkdir -p "$APPDIR/usr/plugins"
-          cp -r "$EXE_DIR/plugins"/* "$APPDIR/usr/plugins/"
+          cp -r "$EXE_DIR_REL/plugins"/* "$APPDIR/usr/plugins/"
+        elif [ -d "plugins" ]; then
+          mkdir -p "$APPDIR/usr/plugins"
+          cp -r "plugins"/* "$APPDIR/usr/plugins/" 2>/dev/null || true
         fi
-        if [ -d "$EXE_DIR/translations" ]; then
+        if [ -d "$EXE_DIR_REL/translations" ]; then
           mkdir -p "$APPDIR/usr/translations"
-          cp -r "$EXE_DIR/translations"/* "$APPDIR/usr/translations/"
+          cp -r "$EXE_DIR_REL/translations"/* "$APPDIR/usr/translations/"
+        elif [ -d "translations" ]; then
+          mkdir -p "$APPDIR/usr/translations"
+          cp -r "translations"/* "$APPDIR/usr/translations/" 2>/dev/null || true
         fi
         
         # Create AppRun script
