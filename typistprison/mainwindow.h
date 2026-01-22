@@ -130,7 +130,7 @@ private:
     void handleMouseEnterMenuButton(QPushButton *button);
     void handleFocusLeaveMenuButton();
     void setupActions();
-    void displayImage(const QPixmap &pixmap, QPoint lastMousePos);
+    void displayImage(const QPixmap &pixmap, QPoint lastMousePos, const QString &imagePath = "");
 
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override;
