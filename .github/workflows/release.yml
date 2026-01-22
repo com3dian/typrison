@@ -141,10 +141,19 @@ jobs:
     - name: Deploy Qt dependencies and create DMG
       run: |
         APP_PATH="${{ steps.find_app.outputs.app_path }}"
-        macdeployqt "$APP_PATH" -dmg
+        # Deploy Qt dependencies into the app bundle
+        macdeployqt "$APP_PATH" -always-overwrite -verbose=2
+        # Create DMG
+        macdeployqt "$APP_PATH" -dmg -always-overwrite
         DMG_PATH="${APP_PATH%.app}.dmg"
         echo "DMG created at: $DMG_PATH"
         ls -lh "$(dirname $DMG_PATH)"
+        
+        # Verify Qt libraries are bundled
+        if [ -d "$APP_PATH/Contents/Frameworks" ]; then
+          echo "Qt frameworks bundled:"
+          ls -lh "$APP_PATH/Contents/Frameworks" | head -10
+        fi
     
     - name: Rename DMG with version
       id: rename_dmg
@@ -323,9 +332,37 @@ jobs:
     - name: Deploy Qt dependencies
       shell: bash
       run: |
-        windeployqt "${{ steps.find_exe.outputs.exe_path }}"
+        EXE_PATH="${{ steps.find_exe.outputs.exe_path }}"
+        EXE_DIR="${{ steps.find_exe.outputs.exe_dir }}"
+        
+        # Get Qt installation path
+        if [ -n "$Qt6_DIR" ]; then
+          QT_BASE=$(dirname "$Qt6_DIR")
+        elif [ -n "$CMAKE_PREFIX_PATH" ]; then
+          QT_BASE="$CMAKE_PREFIX_PATH"
+        else
+          echo "ERROR: Cannot find Qt installation path"
+          exit 1
+        fi
+        
+        echo "Qt base path: $QT_BASE"
+        echo "Deploying Qt dependencies..."
+        
+        # Use windeployqt to bundle all Qt dependencies
+        # windeployqt will copy all required Qt DLLs and plugins to the executable directory
+        windeployqt --release --compiler-runtime --qmldir "$QT_BASE/qml" "$EXE_PATH" || \
+        windeployqt --release "$EXE_PATH"
+        
         echo "Deployed files:"
-        ls -lh "${{ steps.find_exe.outputs.exe_dir }}"
+        ls -lh "$EXE_DIR" | head -30
+        
+        # Verify Qt DLLs are present
+        if ls "$EXE_DIR"/*.dll 1> /dev/null 2>&1; then
+          echo "Qt DLLs found:"
+          ls -lh "$EXE_DIR"/*.dll | head -10
+        else
+          echo "Warning: No DLLs found in deployment directory"
+        fi
     
     - name: Create distributable package
       id: create_package
@@ -505,6 +542,106 @@ jobs:
         EXE_DIR=$(dirname "$EXE_PATH")
         echo "exe_dir=$EXE_DIR" >> $GITHUB_OUTPUT
     
+    - name: Install deployment tools
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y patchelf file
+    
+    - name: Deploy Qt dependencies
+      run: |
+        EXE_PATH="${{ steps.find_exe.outputs.exe_path }}"
+        EXE_DIR="${{ steps.find_exe.outputs.exe_dir }}"
+        
+        # Get Qt installation path
+        if [ -n "$Qt6_DIR" ]; then
+          QT_BASE=$(dirname "$Qt6_DIR")
+        elif [ -n "$CMAKE_PREFIX_PATH" ]; then
+          QT_BASE="$CMAKE_PREFIX_PATH"
+        else
+          echo "ERROR: Cannot find Qt installation path"
+          exit 1
+        fi
+        
+        echo "Qt base path: $QT_BASE"
+        echo "Executable: $EXE_PATH"
+        echo "Executable dir: $EXE_DIR"
+        
+        cd "$EXE_DIR"
+        mkdir -p lib plugins translations
+        
+        # Copy all Qt libraries from Qt installation
+        if [ -d "$QT_BASE/lib" ]; then
+          echo "Copying Qt libraries from installation..."
+          find "$QT_BASE/lib" -name "libQt*.so*" -type f -exec cp -v {} lib/ \; 2>/dev/null || true
+        fi
+        
+        # Copy Qt plugins
+        if [ -d "$QT_BASE/plugins" ]; then
+          echo "Copying Qt plugins..."
+          cp -r "$QT_BASE/plugins"/* plugins/ 2>/dev/null || true
+        fi
+        
+        # Copy Qt translations
+        if [ -d "$QT_BASE/translations" ]; then
+          echo "Copying Qt translations..."
+          cp -r "$QT_BASE/translations"/* translations/ 2>/dev/null || true
+        fi
+        
+        # Find and copy all non-system dependencies of the executable
+        echo "Finding and copying runtime dependencies..."
+        DEPS_FILE=$(mktemp)
+        ldd "$EXE_PATH" 2>/dev/null | grep -v "not found" | awk '{print $3}' > "$DEPS_FILE"
+        
+        # Also get dependencies from Qt libraries we just copied
+        find lib -name "*.so*" -type f -exec ldd {} \; 2>/dev/null | grep -v "not found" | awk '{print $3}' >> "$DEPS_FILE"
+        
+        # Copy dependencies, prioritizing Qt and ICU libraries
+        while IFS= read -r lib_path; do
+          if [ -z "$lib_path" ] || [ ! -f "$lib_path" ]; then
+            continue
+          fi
+          
+          lib_name=$(basename "$lib_path")
+          
+          # Skip if already copied
+          if [ -f "lib/$lib_name" ]; then
+            continue
+          fi
+          
+          # Copy Qt, ICU, and other important libraries
+          # Skip most system libraries but include Qt/ICU even if in system paths
+          if [[ "$lib_name" == libQt* ]] || [[ "$lib_name" == libicu* ]] || \
+             [[ "$lib_name" == libxcb* ]] || [[ "$lib_name" == libX11* ]] || \
+             [[ "$lib_name" == libXext* ]] || [[ "$lib_name" == libXrender* ]] || \
+             [[ "$lib_name" == libXfixes* ]] || [[ "$lib_name" == libXau* ]] || \
+             [[ "$lib_name" == libXdmcp* ]] || [[ "$lib_name" == libxkbcommon* ]] || \
+             [[ "$lib_name" == libfontconfig* ]] || [[ "$lib_name" == libfreetype* ]] || \
+             [[ "$lib_name" == libpng* ]] || [[ "$lib_name" == libjpeg* ]] || \
+             [[ "$lib_name" == libz.so* ]] || [[ "$lib_name" == libharfbuzz* ]] || \
+             [[ "$lib_name" == libdouble-conversion* ]] || [[ "$lib_name" == libpcre2* ]] || \
+             [[ "$lib_name" == libmd4c* ]] || [[ "$lib_name" == libmd4c.so* ]]; then
+            cp "$lib_path" "lib/$lib_name" 2>/dev/null && echo "Copied: $lib_name" || true
+          elif [[ "$lib_path" != /lib/* ]] && [[ "$lib_path" != /lib64/* ]] && \
+               [[ "$lib_path" != /usr/lib/* ]] && [[ "$lib_path" != /usr/lib64/* ]] && \
+               [[ "$lib_path" != /usr/local/lib/* ]]; then
+            # Copy non-system libraries
+            cp "$lib_path" "lib/$lib_name" 2>/dev/null && echo "Copied: $lib_name" || true
+          fi
+        done < "$DEPS_FILE"
+        rm -f "$DEPS_FILE"
+        
+        # Update rpath of the executable to use local lib directory
+        patchelf --set-rpath '$ORIGIN/lib' "$(basename "$EXE_PATH")" 2>/dev/null || echo "Note: patchelf may not be needed or available"
+        
+        # Update rpath of all copied libraries to use relative paths
+        find lib -name "*.so*" -type f -exec patchelf --set-rpath '$ORIGIN' {} \; 2>/dev/null || true
+        
+        echo "Deployment complete. Summary:"
+        echo "Libraries in lib/:"
+        ls -lh lib/ | head -20
+        echo "Plugins:"
+        ls -d plugins/*/ 2>/dev/null | head -10 || echo "No plugin directories"
+    
     - name: Create distributable package
       id: create_package
       run: |
@@ -525,9 +662,14 @@ jobs:
           exit 1
         fi
         
-        # Copy executable
-        cp "$EXE_PATH" "$PACKAGE_DIR/"
+        # Copy everything from the executable directory (including lib, plugins, etc.)
+        cp -r "$EXE_DIR"/* "$PACKAGE_DIR/" 2>/dev/null || true
+        
+        # Ensure executable is in the package
         EXE_NAME=$(basename "$EXE_PATH")
+        if [ ! -f "$PACKAGE_DIR/$EXE_NAME" ]; then
+          cp "$EXE_PATH" "$PACKAGE_DIR/"
+        fi
         chmod +x "$PACKAGE_DIR/$EXE_NAME"
         
         # If executable name is not 'typistprison', create a symlink or rename
@@ -536,32 +678,13 @@ jobs:
           chmod +x "$PACKAGE_DIR/typistprison"
         fi
         
-        # Find and copy Qt libraries
-        if [ -n "$Qt6_DIR" ]; then
-          QT_BASE=$(dirname "$Qt6_DIR")
-          QT_LIB_DIR="$QT_BASE/lib"
-          if [ -d "$QT_LIB_DIR" ]; then
-            mkdir -p "$PACKAGE_DIR/lib"
-            # Copy required Qt libraries
-            for lib in Qt6Core Qt6Gui Qt6Widgets Qt6Network Qt6Concurrent; do
-              find "$QT_LIB_DIR" -name "lib${lib}.so*" -exec cp {} "$PACKAGE_DIR/lib/" \; 2>/dev/null || true
-            done
-          fi
-          
-          # Copy Qt plugins
-          QT_PLUGINS_DIR="$QT_BASE/plugins"
-          if [ -d "$QT_PLUGINS_DIR" ]; then
-            mkdir -p "$PACKAGE_DIR/plugins"
-            cp -r "$QT_PLUGINS_DIR"/* "$PACKAGE_DIR/plugins/" 2>/dev/null || true
-          fi
-        fi
-        
         # Create a run script that sets up the environment
         {
           echo '#!/bin/bash'
           echo 'SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"'
           echo 'export LD_LIBRARY_PATH="$SCRIPT_DIR/lib:$LD_LIBRARY_PATH"'
-          echo 'export QT_PLUGIN_PATH="$SCRIPT_DIR/plugins"'
+          echo 'export QT_PLUGIN_PATH="$SCRIPT_DIR/plugins:$QT_PLUGIN_PATH"'
+          echo 'export QML2_IMPORT_PATH="$SCRIPT_DIR/qml:$QML2_IMPORT_PATH"'
           echo '"$SCRIPT_DIR/typistprison" "$@"'
         } > "$PACKAGE_DIR/run.sh"
         chmod +x "$PACKAGE_DIR/run.sh"
@@ -570,11 +693,14 @@ jobs:
         {
           echo "TypistPrison ${VERSION} for Linux"
           echo ""
+          echo "This package includes all required Qt dependencies."
+          echo ""
           echo "To run:"
           echo "  ./run.sh"
           echo ""
           echo "Or directly:"
           echo "  export LD_LIBRARY_PATH=./lib:\$LD_LIBRARY_PATH"
+          echo "  export QT_PLUGIN_PATH=./plugins:\$QT_PLUGIN_PATH"
           echo "  ./typistprison"
         } > "$PACKAGE_DIR/README.txt"
         
