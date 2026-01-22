@@ -787,16 +787,32 @@ jobs:
         cp "$EXE_PATH_REL" "$APPDIR/usr/bin/$APP_NAME"
         chmod +x "$APPDIR/usr/bin/$APP_NAME"
         
-        # Create .desktop file
+        # Ensure applications directory exists
+        mkdir -p "$APPDIR/usr/share/applications"
+        
+        # Create .desktop file with all required fields
+        DESKTOP_FILE="$APPDIR/usr/share/applications/${APP_NAME}.desktop"
         printf '%s\n' \
           '[Desktop Entry]' \
           'Type=Application' \
           'Name=TypistPrison' \
+          'GenericName=Text Editor' \
           'Comment=Typist Prison Application' \
           'Exec=TypistPrison' \
           'Icon=TypistPrison' \
-          'Categories=Utility;' \
-          > "$APPDIR/usr/share/applications/${APP_NAME}.desktop"
+          'Categories=Utility;TextEditor;' \
+          'Terminal=false' \
+          'StartupNotify=true' \
+          > "$DESKTOP_FILE"
+        
+        # Verify desktop file was created
+        if [ ! -f "$DESKTOP_FILE" ]; then
+          echo "ERROR: Failed to create desktop file!"
+          exit 1
+        fi
+        
+        echo "Desktop file created at: $DESKTOP_FILE"
+        cat "$DESKTOP_FILE"
         
         # Copy icon if it exists, otherwise create a placeholder
         if [ -f "../icons/typrison_icon.png" ]; then
@@ -856,10 +872,48 @@ jobs:
         export QMAKE="$QT_BASE/bin/qmake"
         ./linuxdeploy-plugin-qt-x86_64.AppImage --appdir="$APPDIR" || echo "Qt plugin completed"
         
+        # Verify AppDir structure before creating AppImage
+        echo "Verifying AppDir structure..."
+        echo "Desktop file: $APPDIR/usr/share/applications/${APP_NAME}.desktop"
+        if [ -f "$APPDIR/usr/share/applications/${APP_NAME}.desktop" ]; then
+          echo "Desktop file exists"
+          cat "$APPDIR/usr/share/applications/${APP_NAME}.desktop"
+        else
+          echo "ERROR: Desktop file not found!"
+          echo "AppDir structure:"
+          find "$APPDIR" -type f | head -20
+          exit 1
+        fi
+        
+        echo "Icon file: $APPDIR/usr/share/icons/hicolor/256x256/apps/${APP_NAME}.png"
+        if [ ! -f "$APPDIR/usr/share/icons/hicolor/256x256/apps/${APP_NAME}.png" ]; then
+          echo "Warning: Icon file not found, creating placeholder..."
+          mkdir -p "$APPDIR/usr/share/icons/hicolor/256x256/apps"
+          echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==" | base64 -d > "$APPDIR/usr/share/icons/hicolor/256x256/apps/${APP_NAME}.png" 2>/dev/null || true
+        fi
+        
+        echo "Executable: $APPDIR/usr/bin/$APP_NAME"
+        if [ ! -f "$APPDIR/usr/bin/$APP_NAME" ]; then
+          echo "ERROR: Executable not found!"
+          exit 1
+        fi
+        
+        echo "AppRun: $APPDIR/AppRun"
+        if [ ! -f "$APPDIR/AppRun" ]; then
+          echo "ERROR: AppRun not found!"
+          exit 1
+        fi
+        
         # Create AppImage using appimagetool
+        # appimagetool should automatically find the desktop file in usr/share/applications/
         ARCH=x86_64 VERSION="$VERSION" ./appimagetool-x86_64.AppImage "$APPDIR" "$APPIMAGE_NAME" || {
-          echo "appimagetool with ARCH failed, trying without..."
-          ./appimagetool-x86_64.AppImage "$APPDIR" "$APPIMAGE_NAME"
+          echo "appimagetool with ARCH failed, trying without ARCH and VERSION..."
+          ./appimagetool-x86_64.AppImage "$APPDIR" "$APPIMAGE_NAME" || {
+            echo "appimagetool failed, checking AppDir contents..."
+            echo "AppDir contents:"
+            find "$APPDIR" -type f
+            exit 1
+          }
         }
         
         # Verify AppImage was created
