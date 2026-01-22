@@ -15,6 +15,7 @@ jobs:
     
     - name: Install Qt
       uses: jurplel/install-qt-action@v4
+      id: install-qt
       with:
         version: '6.8.0'
         host: 'mac'
@@ -26,14 +27,34 @@ jobs:
     - name: Configure CMake
       run: |
         cd typistprison
-        mkdir build-release
+        mkdir -p build-release
         cd build-release
-        cmake -DCMAKE_BUILD_TYPE=Release ..
+        echo "Environment variables:"
+        env | grep -i qt || true
+        echo "Qt6_DIR: $Qt6_DIR"
+        echo "CMAKE_PREFIX_PATH: $CMAKE_PREFIX_PATH"
+        echo "Running CMake configuration..."
+        if [ -n "$Qt6_DIR" ]; then
+          cmake -DCMAKE_BUILD_TYPE=Release \
+                -DQt6_DIR="$Qt6_DIR" \
+                -G "Unix Makefiles" \
+                .. 2>&1 | tee cmake_output.log
+        else
+          cmake -DCMAKE_BUILD_TYPE=Release \
+                -G "Unix Makefiles" \
+                .. 2>&1 | tee cmake_output.log
+        fi
+        echo "CMake configuration completed. Checking for Makefile..."
+        ls -la | grep -E "(Makefile|CMakeCache)" || (echo "Warning: No Makefile or CMakeCache found!" && cat cmake_output.log && exit 1)
     
     - name: Build
       run: |
         cd typistprison/build-release
-        cmake --build . --config Release
+        if [ ! -f "Makefile" ]; then
+          echo "Error: No Makefile found! CMake configuration may have failed."
+          exit 1
+        fi
+        cmake --build . --config Release -j$(sysctl -n hw.ncpu)
     
     - name: Find .app bundle
       id: find_app
@@ -90,6 +111,7 @@ jobs:
     
     - name: Install Qt
       uses: jurplel/install-qt-action@v4
+      id: install-qt
       with:
         version: '6.8.0'
         host: 'windows'
@@ -104,18 +126,36 @@ jobs:
         arch: x64
     
     - name: Install Ninja
-      run: choco install ninja
+      run: choco install ninja -y
     
     - name: Configure CMake
+      shell: bash
       run: |
         cd typistprison
-        mkdir build-release
+        mkdir -p build-release
         cd build-release
-        cmake -DCMAKE_BUILD_TYPE=Release -G "Ninja" ..
+        echo "Environment variables:"
+        env | grep -i qt || true
+        echo "Qt6_DIR: $Qt6_DIR"
+        echo "CMAKE_PREFIX_PATH: $CMAKE_PREFIX_PATH"
+        if [ -n "$Qt6_DIR" ]; then
+          cmake -DCMAKE_BUILD_TYPE=Release \
+                -DQt6_DIR="$Qt6_DIR" \
+                -G "Ninja" ..
+        else
+          cmake -DCMAKE_BUILD_TYPE=Release -G "Ninja" ..
+        fi
+        echo "CMake configuration completed. Checking for build files..."
+        ls -la | grep -E "(build.ninja|CMakeCache)" || echo "Warning: No build files found!"
     
     - name: Build
+      shell: bash
       run: |
         cd typistprison/build-release
+        if [ ! -f "build.ninja" ]; then
+          echo "Error: No build.ninja found! CMake configuration may have failed."
+          exit 1
+        fi
         cmake --build . --config Release
     
     - name: Find EXE
@@ -171,3 +211,158 @@ jobs:
         asset_path: ${{ steps.create_package.outputs.package_path }}
         asset_name: ${{ steps.create_package.outputs.package_name }}
         asset_content_type: application/zip
+
+  build-linux:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          ninja-build \
+          libgl1-mesa-dev \
+          libglib2.0-dev \
+          libxkbcommon-x11-0 \
+          libxkbcommon-dev
+    
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v4
+      id: install-qt
+      with:
+        version: '6.8.0'
+        host: 'linux'
+        target: 'desktop'
+        arch: 'gcc_64'
+        modules: 'qtcharts qtnetworkauth'
+        cache: true
+    
+    - name: Configure CMake
+      run: |
+        cd typistprison
+        mkdir -p build-release
+        cd build-release
+        echo "Environment variables:"
+        env | grep -i qt || true
+        echo "Qt6_DIR: $Qt6_DIR"
+        echo "CMAKE_PREFIX_PATH: $CMAKE_PREFIX_PATH"
+        if [ -n "$Qt6_DIR" ]; then
+          cmake -DCMAKE_BUILD_TYPE=Release \
+                -DQt6_DIR="$Qt6_DIR" \
+                -G "Ninja" ..
+        else
+          cmake -DCMAKE_BUILD_TYPE=Release -G "Ninja" ..
+        fi
+        echo "CMake configuration completed. Checking for build files..."
+        ls -la | grep -E "(build.ninja|CMakeCache)" || echo "Warning: No build files found!"
+    
+    - name: Build
+      run: |
+        cd typistprison/build-release
+        if [ ! -f "build.ninja" ]; then
+          echo "Error: No build.ninja found! CMake configuration may have failed."
+          exit 1
+        fi
+        cmake --build . --config Release
+    
+    - name: Find executable
+      id: find_exe
+      run: |
+        EXE_PATH=$(find typistprison/build-release -name "typistprison" -type f -executable | head -n 1)
+        if [ -z "$EXE_PATH" ]; then
+          # Try alternative locations
+          EXE_PATH=$(find typistprison/build-release -type f -executable | grep -v ".so" | head -n 1)
+        fi
+        echo "exe_path=$EXE_PATH" >> $GITHUB_OUTPUT
+        echo "Found executable at: $EXE_PATH"
+        EXE_DIR=$(dirname "$EXE_PATH")
+        echo "exe_dir=$EXE_DIR" >> $GITHUB_OUTPUT
+    
+    - name: Create distributable package
+      id: create_package
+      run: |
+        VERSION="${GITHUB_REF#refs/tags/}"
+        if [ -z "$VERSION" ] || [ "$VERSION" == "$GITHUB_REF" ]; then
+          VERSION="dev"
+        fi
+        EXE_PATH="${{ steps.find_exe.outputs.exe_path }}"
+        EXE_DIR="${{ steps.find_exe.outputs.exe_dir }}"
+        PACKAGE_NAME="TypistPrison-${VERSION}-Linux"
+        PACKAGE_DIR="typistprison/build-release/$PACKAGE_NAME"
+        
+        mkdir -p "$PACKAGE_DIR"
+        
+        # Copy executable
+        cp "$EXE_PATH" "$PACKAGE_DIR/"
+        chmod +x "$PACKAGE_DIR/typistprison"
+        
+        # Find and copy Qt libraries
+        if [ -n "$Qt6_DIR" ]; then
+          QT_BASE=$(dirname "$Qt6_DIR")
+          QT_LIB_DIR="$QT_BASE/lib"
+          if [ -d "$QT_LIB_DIR" ]; then
+            mkdir -p "$PACKAGE_DIR/lib"
+            # Copy required Qt libraries
+            for lib in Qt6Core Qt6Gui Qt6Widgets Qt6Network Qt6Concurrent; do
+              find "$QT_LIB_DIR" -name "lib${lib}.so*" -exec cp {} "$PACKAGE_DIR/lib/" \; 2>/dev/null || true
+            done
+          fi
+          
+          # Copy Qt plugins
+          QT_PLUGINS_DIR="$QT_BASE/plugins"
+          if [ -d "$QT_PLUGINS_DIR" ]; then
+            mkdir -p "$PACKAGE_DIR/plugins"
+            cp -r "$QT_PLUGINS_DIR"/* "$PACKAGE_DIR/plugins/" 2>/dev/null || true
+          fi
+        fi
+        
+        # Create a run script that sets up the environment
+        cat > "$PACKAGE_DIR/run.sh" << 'EOF'
+#!/bin/bash
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export LD_LIBRARY_PATH="$SCRIPT_DIR/lib:$LD_LIBRARY_PATH"
+export QT_PLUGIN_PATH="$SCRIPT_DIR/plugins"
+"$SCRIPT_DIR/typistprison" "$@"
+EOF
+        chmod +x "$PACKAGE_DIR/run.sh"
+        
+        # Create README
+        cat > "$PACKAGE_DIR/README.txt" << EOF
+TypistPrison ${VERSION} for Linux
+
+To run:
+  ./run.sh
+
+Or directly:
+  export LD_LIBRARY_PATH=./lib:\$LD_LIBRARY_PATH
+  ./typistprison
+EOF
+        
+        # Create tarball
+        cd typistprison/build-release
+        tar -czf "${PACKAGE_NAME}.tar.gz" "$PACKAGE_NAME"
+        
+        echo "package_name=${PACKAGE_NAME}.tar.gz" >> $GITHUB_OUTPUT
+        echo "package_path=typistprison/build-release/${PACKAGE_NAME}.tar.gz" >> $GITHUB_OUTPUT
+    
+    - name: Upload Linux package artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: linux-app
+        path: ${{ steps.create_package.outputs.package_path }}
+    
+    - name: Upload package to release
+      if: github.event_name == 'release'
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: ${{ steps.create_package.outputs.package_path }}
+        asset_name: ${{ steps.create_package.outputs.package_name }}
+        asset_content_type: application/octet-stream
