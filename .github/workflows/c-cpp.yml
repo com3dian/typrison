@@ -33,7 +33,6 @@ jobs:
         host: 'linux'
         target: 'desktop'
         arch: 'gcc_64'
-        modules: 'qtcharts qtnetworkauth'
         cache: true
     
     - name: Verify Qt installation

@@ -21,7 +21,6 @@ jobs:
         host: 'mac'
         target: 'desktop'
         arch: 'clang_64'
-        modules: 'qtcharts qtnetworkauth'
         cache: true
     
     - name: Verify Qt installation
@@ -154,7 +153,6 @@ jobs:
         host: 'windows'
         target: 'desktop'
         arch: 'win64_msvc2019_64'
-        modules: 'qtcharts qtnetworkauth'
         cache: true
     
     - name: Setup MSVC
@@ -300,7 +298,6 @@ jobs:
         host: 'linux'
         target: 'desktop'
         arch: 'gcc_64'
-        modules: 'qtcharts qtnetworkauth'
         cache: true
     
     - name: Configure CMake
