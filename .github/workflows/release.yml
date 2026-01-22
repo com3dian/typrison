@@ -596,7 +596,7 @@ jobs:
     - name: Install deployment tools
       run: |
         sudo apt-get update
-        sudo apt-get install -y patchelf file fuse libfuse2
+        sudo apt-get install -y patchelf file fuse libfuse2 imagemagick
     
     - name: Deploy Qt dependencies
       run: |
@@ -805,6 +805,9 @@ jobs:
           'StartupNotify=true' \
           > "$DESKTOP_FILE"
         
+        # Set proper permissions on desktop file
+        chmod 644 "$DESKTOP_FILE"
+        
         # Verify desktop file was created
         if [ ! -f "$DESKTOP_FILE" ]; then
           echo "ERROR: Failed to create desktop file!"
@@ -812,14 +815,48 @@ jobs:
         fi
         
         echo "Desktop file created at: $DESKTOP_FILE"
+        echo "Desktop file permissions: $(ls -l "$DESKTOP_FILE")"
         cat "$DESKTOP_FILE"
         
-        # Copy icon if it exists, otherwise create a placeholder
+        # Ensure icon directory exists
+        mkdir -p "$APPDIR/usr/share/icons/hicolor/256x256/apps"
+        
+        # Copy and resize icon if it exists, otherwise create a proper 256x256 placeholder
+        ICON_FILE="$APPDIR/usr/share/icons/hicolor/256x256/apps/${APP_NAME}.png"
         if [ -f "../icons/typrison_icon.png" ]; then
-          cp "../icons/typrison_icon.png" "$APPDIR/usr/share/icons/hicolor/256x256/apps/${APP_NAME}.png"
+          echo "Found icon file, resizing to exactly 256x256..."
+          # Resize icon to exactly 256x256 using ImageMagick
+          convert "../icons/typrison_icon.png" -resize 256x256! "$ICON_FILE"
+          echo "Icon resized and saved to: $ICON_FILE"
+          # Verify icon size
+          identify "$ICON_FILE" || echo "Warning: Could not verify icon size"
         else
-          # Create a simple placeholder icon (1x1 transparent PNG)
-          echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==" | base64 -d > "$APPDIR/usr/share/icons/hicolor/256x256/apps/${APP_NAME}.png" 2>/dev/null || true
+          echo "Icon file not found, creating 256x256 placeholder..."
+          # Create a proper 256x256 transparent PNG using ImageMagick
+          convert -size 256x256 xc:none -alpha on "$ICON_FILE" || {
+            # Fallback: create using base64 if ImageMagick fails
+            echo "ImageMagick failed, using fallback method..."
+            # This creates a minimal 1x1 PNG, but we need 256x256
+            # For now, create a simple colored square as placeholder
+            convert -size 256x256 xc:'#2E7D32' "$ICON_FILE" 2>/dev/null || true
+          }
+        fi
+        
+        # Verify icon file exists and has correct size
+        if [ ! -f "$ICON_FILE" ]; then
+          echo "ERROR: Icon file was not created!"
+          exit 1
+        fi
+        
+        # Check icon dimensions
+        ICON_SIZE=$(identify -format "%wx%h" "$ICON_FILE" 2>/dev/null || echo "unknown")
+        echo "Icon file created at: $ICON_FILE"
+        echo "Icon size: $ICON_SIZE"
+        if [ "$ICON_SIZE" != "256x256" ] && [ "$ICON_SIZE" != "unknown" ]; then
+          echo "Warning: Icon size is $ICON_SIZE, expected 256x256. Resizing..."
+          convert "$ICON_FILE" -resize 256x256! "$ICON_FILE"
+          ICON_SIZE=$(identify -format "%wx%h" "$ICON_FILE" 2>/dev/null || echo "unknown")
+          echo "Icon size after resize: $ICON_SIZE"
         fi
         
         # Copy all dependencies from the deployment directory
@@ -837,13 +874,13 @@ jobs:
           mkdir -p "$APPDIR/usr/plugins"
           cp -r "plugins"/* "$APPDIR/usr/plugins/" 2>/dev/null || true
         fi
-        if [ -d "$EXE_DIR_REL/translations" ]; then
-          mkdir -p "$APPDIR/usr/translations"
-          cp -r "$EXE_DIR_REL/translations"/* "$APPDIR/usr/translations/"
-        elif [ -d "translations" ]; then
-          mkdir -p "$APPDIR/usr/translations"
-          cp -r "translations"/* "$APPDIR/usr/translations/" 2>/dev/null || true
-        fi
+        # Skip copying translations - they're usually not needed and make AppImage huge
+        # If your app needs specific translations, copy only those
+        # if [ -d "$EXE_DIR_REL/translations" ]; then
+        #   mkdir -p "$APPDIR/usr/translations"
+        #   # Only copy app-specific translations if any
+        #   find "$EXE_DIR_REL/translations" -name "*typistprison*.qm" -exec cp {} "$APPDIR/usr/translations/" \; 2>/dev/null || true
+        # fi
         
         # Create AppRun script
         printf '%s\n' \
@@ -872,6 +909,16 @@ jobs:
         export QMAKE="$QT_BASE/bin/qmake"
         ./linuxdeploy-plugin-qt-x86_64.AppImage --appdir="$APPDIR" || echo "Qt plugin completed"
         
+        # Remove unnecessary translations to reduce AppImage size
+        # Qt translations are usually not needed unless your app uses them
+        # linuxdeploy may have copied them, so remove after it runs
+        if [ -d "$APPDIR/usr/translations" ]; then
+          TRANS_COUNT=$(find "$APPDIR/usr/translations" -type f 2>/dev/null | wc -l)
+          echo "Removing $TRANS_COUNT unnecessary Qt translation files to reduce AppImage size..."
+          rm -rf "$APPDIR/usr/translations"
+          echo "Translations removed"
+        fi
+        
         # Verify AppDir structure before creating AppImage
         echo "Verifying AppDir structure..."
         echo "Desktop file: $APPDIR/usr/share/applications/${APP_NAME}.desktop"
@@ -886,10 +933,27 @@ jobs:
         fi
         
         echo "Icon file: $APPDIR/usr/share/icons/hicolor/256x256/apps/${APP_NAME}.png"
-        if [ ! -f "$APPDIR/usr/share/icons/hicolor/256x256/apps/${APP_NAME}.png" ]; then
-          echo "Warning: Icon file not found, creating placeholder..."
+        ICON_FILE="$APPDIR/usr/share/icons/hicolor/256x256/apps/${APP_NAME}.png"
+        if [ ! -f "$ICON_FILE" ]; then
+          echo "Warning: Icon file not found, creating 256x256 placeholder..."
           mkdir -p "$APPDIR/usr/share/icons/hicolor/256x256/apps"
-          echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==" | base64 -d > "$APPDIR/usr/share/icons/hicolor/256x256/apps/${APP_NAME}.png" 2>/dev/null || true
+          convert -size 256x256 xc:'#2E7D32' "$ICON_FILE" 2>/dev/null || {
+            echo "ImageMagick failed, using fallback..."
+            # Fallback: create minimal PNG
+            echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==" | base64 -d > "$ICON_FILE" 2>/dev/null || true
+          }
+        fi
+        
+        # Verify icon is exactly 256x256
+        if [ -f "$ICON_FILE" ]; then
+          ICON_SIZE=$(identify -format "%wx%h" "$ICON_FILE" 2>/dev/null || echo "unknown")
+          echo "Icon size: $ICON_SIZE"
+          if [ "$ICON_SIZE" != "256x256" ] && [ "$ICON_SIZE" != "unknown" ]; then
+            echo "Resizing icon to exactly 256x256..."
+            convert "$ICON_FILE" -resize 256x256! "$ICON_FILE"
+            ICON_SIZE=$(identify -format "%wx%h" "$ICON_FILE" 2>/dev/null || echo "unknown")
+            echo "Icon size after resize: $ICON_SIZE"
+          fi
         fi
         
         echo "Executable: $APPDIR/usr/bin/$APP_NAME"
@@ -904,14 +968,62 @@ jobs:
           exit 1
         fi
         
+        # Final verification before creating AppImage
+        echo "Final verification before creating AppImage..."
+        DESKTOP_FILE="$APPDIR/usr/share/applications/${APP_NAME}.desktop"
+        ICON_FILE="$APPDIR/usr/share/icons/hicolor/256x256/apps/${APP_NAME}.png"
+        
+        if [ ! -f "$DESKTOP_FILE" ]; then
+          echo "ERROR: Desktop file missing at: $DESKTOP_FILE"
+          echo "Creating it now..."
+          mkdir -p "$(dirname "$DESKTOP_FILE")"
+          printf '%s\n' \
+            '[Desktop Entry]' \
+            'Type=Application' \
+            'Name=TypistPrison' \
+            'GenericName=Text Editor' \
+            'Comment=Typist Prison Application' \
+            'Exec=TypistPrison' \
+            'Icon=TypistPrison' \
+            'Categories=Utility;TextEditor;' \
+            'Terminal=false' \
+            'StartupNotify=true' \
+            > "$DESKTOP_FILE"
+          chmod 644 "$DESKTOP_FILE"
+        fi
+        
+        if [ ! -f "$ICON_FILE" ]; then
+          echo "ERROR: Icon file missing at: $ICON_FILE"
+          echo "Creating 256x256 placeholder..."
+          mkdir -p "$(dirname "$ICON_FILE")"
+          convert -size 256x256 xc:'#2E7D32' "$ICON_FILE"
+        fi
+        
+        # Verify icon is exactly 256x256
+        ICON_SIZE=$(identify -format "%wx%h" "$ICON_FILE" 2>/dev/null || echo "unknown")
+        if [ "$ICON_SIZE" != "256x256" ]; then
+          echo "Resizing icon from $ICON_SIZE to 256x256..."
+          convert "$ICON_FILE" -resize 256x256! "$ICON_FILE"
+          ICON_SIZE=$(identify -format "%wx%h" "$ICON_FILE" 2>/dev/null || echo "unknown")
+          echo "Icon size after resize: $ICON_SIZE"
+        fi
+        
+        echo "Desktop file: $([ -f "$DESKTOP_FILE" ] && echo 'EXISTS' || echo 'MISSING')"
+        echo "Icon file: $([ -f "$ICON_FILE" ] && echo "EXISTS ($ICON_SIZE)" || echo 'MISSING')"
+        echo "Executable: $([ -f "$APPDIR/usr/bin/$APP_NAME" ] && echo 'EXISTS' || echo 'MISSING')"
+        echo "AppRun: $([ -f "$APPDIR/AppRun" ] && echo 'EXISTS' || echo 'MISSING')"
+        
         # Create AppImage using appimagetool
         # appimagetool should automatically find the desktop file in usr/share/applications/
-        ARCH=x86_64 VERSION="$VERSION" ./appimagetool-x86_64.AppImage "$APPDIR" "$APPIMAGE_NAME" || {
+        echo "Creating AppImage..."
+        ARCH=x86_64 VERSION="$VERSION" ./appimagetool-x86_64.AppImage "$APPDIR" "$APPIMAGE_NAME" 2>&1 || {
           echo "appimagetool with ARCH failed, trying without ARCH and VERSION..."
-          ./appimagetool-x86_64.AppImage "$APPDIR" "$APPIMAGE_NAME" || {
-            echo "appimagetool failed, checking AppDir contents..."
-            echo "AppDir contents:"
-            find "$APPDIR" -type f
+          ./appimagetool-x86_64.AppImage "$APPDIR" "$APPIMAGE_NAME" 2>&1 || {
+            echo "appimagetool failed. Checking critical files..."
+            echo "Desktop file exists: $([ -f "$APPDIR/usr/share/applications/${APP_NAME}.desktop" ] && echo 'YES' || echo 'NO')"
+            echo "Executable exists: $([ -f "$APPDIR/usr/bin/$APP_NAME" ] && echo 'YES' || echo 'NO')"
+            echo "AppRun exists: $([ -f "$APPDIR/AppRun" ] && echo 'YES' || echo 'NO')"
+            echo "AppDir size: $(du -sh "$APPDIR" 2>/dev/null | cut -f1)"
             exit 1
           }
         }
