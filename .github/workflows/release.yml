@@ -730,7 +730,10 @@ jobs:
         
         echo "Creating AppImage: $APPIMAGE_NAME"
         
-        # Download linuxdeploy
+        # Change to build directory first
+        cd typistprison/build-release
+        
+        # Download linuxdeploy tools to build directory
         wget -q -O linuxdeploy-x86_64.AppImage https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
         chmod +x linuxdeploy-x86_64.AppImage
         
@@ -738,8 +741,12 @@ jobs:
         wget -q -O linuxdeploy-plugin-qt-x86_64.AppImage https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
         chmod +x linuxdeploy-plugin-qt-x86_64.AppImage
         
-        # Create AppDir structure
-        APPDIR="typistprison/build-release/AppDir"
+        # Download appimagetool
+        wget -q -O appimagetool-x86_64.AppImage https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+        chmod +x appimagetool-x86_64.AppImage
+        
+        # Create AppDir structure (relative to current directory)
+        APPDIR="AppDir"
         rm -rf "$APPDIR"
         mkdir -p "$APPDIR/usr/bin"
         mkdir -p "$APPDIR/usr/lib"
@@ -763,8 +770,8 @@ jobs:
           > "$APPDIR/usr/share/applications/${APP_NAME}.desktop"
         
         # Copy icon if it exists, otherwise create a placeholder
-        if [ -f "typistprison/icons/typrison_icon.png" ]; then
-          cp "typistprison/icons/typrison_icon.png" "$APPDIR/usr/share/icons/hicolor/256x256/apps/${APP_NAME}.png"
+        if [ -f "../icons/typrison_icon.png" ]; then
+          cp "../icons/typrison_icon.png" "$APPDIR/usr/share/icons/hicolor/256x256/apps/${APP_NAME}.png"
         else
           # Create a simple placeholder icon (1x1 transparent PNG)
           echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==" | base64 -d > "$APPDIR/usr/share/icons/hicolor/256x256/apps/${APP_NAME}.png" 2>/dev/null || true
@@ -783,50 +790,38 @@ jobs:
           cp -r "$EXE_DIR/translations"/* "$APPDIR/usr/translations/"
         fi
         
+        # Create AppRun script
+        printf '%s\n' \
+          '#!/bin/bash' \
+          'HERE="$(dirname "$(readlink -f "${0}")")"' \
+          'export LD_LIBRARY_PATH="${HERE}/usr/lib:${LD_LIBRARY_PATH}"' \
+          'export QT_PLUGIN_PATH="${HERE}/usr/plugins:${QT_PLUGIN_PATH}"' \
+          'export QML2_IMPORT_PATH="${HERE}/usr/qml:${QML2_IMPORT_PATH}"' \
+          'exec "${HERE}/usr/bin/TypistPrison" "$@"' \
+          > "$APPDIR/AppRun"
+        chmod +x "$APPDIR/AppRun"
+        
         # Set up environment for linuxdeploy
         export QMAKE="$QT_BASE/bin/qmake"
         export PATH="$QT_BASE/bin:$PATH"
+        export LD_LIBRARY_PATH="$QT_BASE/lib:$LD_LIBRARY_PATH"
         
-        # Run linuxdeploy to bundle everything
-        cd typistprison/build-release
-        
-        # First, let linuxdeploy find and copy Qt libraries
+        # Run linuxdeploy to bundle libraries
         ./linuxdeploy-x86_64.AppImage \
           --appdir="$APPDIR" \
           --executable="$APPDIR/usr/bin/$APP_NAME" \
           --desktop-file="$APPDIR/usr/share/applications/${APP_NAME}.desktop" \
-          --icon-file="$APPDIR/usr/share/icons/hicolor/256x256/apps/${APP_NAME}.png" \
-          --plugin=qt \
-          --output=appimage || true
+          --icon-file="$APPDIR/usr/share/icons/hicolor/256x256/apps/${APP_NAME}.png" || echo "linuxdeploy base completed"
         
-        # If the above didn't create the AppImage, try with explicit Qt path
-        if [ ! -f "$APPIMAGE_NAME" ]; then
-          QT_PLUGIN_PATH="$QT_BASE/plugins" \
-          ./linuxdeploy-plugin-qt-x86_64.AppImage \
-            --appdir="$APPDIR" \
-            --qmake="$QT_BASE/bin/qmake" || true
-          
-          # Create AppImage manually if linuxdeploy didn't
-          if [ ! -f "$APPIMAGE_NAME" ]; then
-            # Download appimagetool as fallback
-            wget -q -O appimagetool-x86_64.AppImage https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
-            chmod +x appimagetool-x86_64.AppImage
-            
-            # Create AppRun script
-            printf '%s\n' \
-              '#!/bin/bash' \
-              'HERE="$(dirname "$(readlink -f "${0}")")"' \
-              'export LD_LIBRARY_PATH="${HERE}/usr/lib:${LD_LIBRARY_PATH}"' \
-              'export QT_PLUGIN_PATH="${HERE}/usr/plugins:${QT_PLUGIN_PATH}"' \
-              'export QML2_IMPORT_PATH="${HERE}/usr/qml:${QML2_IMPORT_PATH}"' \
-              'exec "${HERE}/usr/bin/TypistPrison" "$@"' \
-              > "$APPDIR/AppRun"
-            chmod +x "$APPDIR/AppRun"
-            
-            # Create AppImage
-            ARCH=x86_64 ./appimagetool-x86_64.AppImage "$APPDIR" "$APPIMAGE_NAME"
-          fi
-        fi
+        # Run Qt plugin to bundle Qt libraries
+        export QMAKE="$QT_BASE/bin/qmake"
+        ./linuxdeploy-plugin-qt-x86_64.AppImage --appdir="$APPDIR" || echo "Qt plugin completed"
+        
+        # Create AppImage using appimagetool
+        ARCH=x86_64 VERSION="$VERSION" ./appimagetool-x86_64.AppImage "$APPDIR" "$APPIMAGE_NAME" || {
+          echo "appimagetool with ARCH failed, trying without..."
+          ./appimagetool-x86_64.AppImage "$APPDIR" "$APPIMAGE_NAME"
+        }
         
         # Verify AppImage was created
         if [ ! -f "$APPIMAGE_NAME" ]; then
