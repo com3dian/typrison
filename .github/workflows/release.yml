@@ -4,10 +4,15 @@ on:
   release:
     types: [created, published]
   workflow_dispatch: # Allows manual trigger for testing
+    inputs:
+      version:
+        description: 'Version to build (optional, uses tag if not provided)'
+        required: false
 
 jobs:
   build-macos:
     runs-on: macos-latest
+    continue-on-error: false
     
     steps:
     - name: Checkout code
@@ -127,8 +132,23 @@ jobs:
         name: macos-dmg
         path: ${{ steps.rename_dmg.outputs.dmg_path }}
     
-    - name: Upload DMG to release
+    - name: Debug release info
       if: github.event_name == 'release'
+      run: |
+        echo "Event name: ${{ github.event_name }}"
+        echo "Release upload URL: ${{ github.event.release.upload_url }}"
+        echo "DMG path: ${{ steps.rename_dmg.outputs.dmg_path }}"
+        echo "DMG name: ${{ steps.rename_dmg.outputs.dmg_name }}"
+        if [ -f "${{ steps.rename_dmg.outputs.dmg_path }}" ]; then
+          echo "DMG file exists!"
+          ls -lh "${{ steps.rename_dmg.outputs.dmg_path }}"
+        else
+          echo "ERROR: DMG file not found!"
+        fi
+    
+    - name: Upload DMG to release
+      if: github.event_name == 'release' && steps.rename_dmg.outputs.dmg_path != '' && github.event.release.upload_url != ''
+      continue-on-error: true
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -140,6 +160,7 @@ jobs:
 
   build-windows:
     runs-on: windows-latest
+    continue-on-error: false
     
     steps:
     - name: Checkout code
@@ -149,11 +170,11 @@ jobs:
       uses: jurplel/install-qt-action@v4
       id: install-qt
       with:
-        version: '6.8.0'
+        version: '6.5.3'
         host: 'windows'
         target: 'desktop'
         arch: 'win64_msvc2019_64'
-        cache: true
+        cache: false
     
     - name: Setup MSVC
       uses: ilammy/msvc-dev-cmd@v1
@@ -261,7 +282,8 @@ jobs:
         path: ${{ steps.create_package.outputs.package_path }}
     
     - name: Upload package to release
-      if: github.event_name == 'release'
+      if: github.event_name == 'release' && steps.create_package.outputs.package_path != ''
+      continue-on-error: true
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -273,6 +295,7 @@ jobs:
 
   build-linux:
     runs-on: ubuntu-latest
+    continue-on-error: false
     
     steps:
     - name: Checkout code
@@ -353,17 +376,43 @@ jobs:
           exit 1
         fi
         cmake --build . --config Release
+        echo "Build completed. Listing build directory:"
+        find . -type f -executable 2>/dev/null | head -20
+        ls -la . || true
     
     - name: Find executable
       id: find_exe
       run: |
-        EXE_PATH=$(find typistprison/build-release -name "typistprison" -type f -executable | head -n 1)
+        echo "Searching for executable in typistprison/build-release..."
+        echo "All files in build directory:"
+        find typistprison/build-release -type f 2>/dev/null | head -30
+        echo ""
+        echo "All executables:"
+        find typistprison/build-release -type f -executable 2>/dev/null | head -10
+        echo ""
+        
+        # Try to find the executable with various names
+        EXE_PATH=$(find typistprison/build-release -name "typistprison" -type f -executable 2>/dev/null | head -n 1)
         if [ -z "$EXE_PATH" ]; then
-          # Try alternative locations
-          EXE_PATH=$(find typistprison/build-release -type f -executable | grep -v ".so" | head -n 1)
+          echo "Executable 'typistprison' not found, trying 'TypistPrison'..."
+          EXE_PATH=$(find typistprison/build-release -name "TypistPrison" -type f -executable 2>/dev/null | head -n 1)
         fi
+        if [ -z "$EXE_PATH" ]; then
+          echo "Trying any executable file (excluding libraries)..."
+          EXE_PATH=$(find typistprison/build-release -type f -executable 2>/dev/null | grep -v "\.so" | grep -v "\.a" | grep -v "CMakeFiles" | head -n 1)
+        fi
+        
+        if [ -z "$EXE_PATH" ] || [ ! -f "$EXE_PATH" ]; then
+          echo "ERROR: No executable found!"
+          echo "Build directory structure:"
+          ls -laR typistprison/build-release/ 2>/dev/null | head -50
+          exit 1
+        fi
+        
         echo "exe_path=$EXE_PATH" >> $GITHUB_OUTPUT
         echo "Found executable at: $EXE_PATH"
+        ls -lh "$EXE_PATH"
+        file "$EXE_PATH"
         EXE_DIR=$(dirname "$EXE_PATH")
         echo "exe_dir=$EXE_DIR" >> $GITHUB_OUTPUT
     
@@ -381,9 +430,22 @@ jobs:
         
         mkdir -p "$PACKAGE_DIR"
         
+        # Verify executable exists before copying
+        if [ -z "$EXE_PATH" ] || [ ! -f "$EXE_PATH" ]; then
+          echo "ERROR: Executable not found at: $EXE_PATH"
+          exit 1
+        fi
+        
         # Copy executable
         cp "$EXE_PATH" "$PACKAGE_DIR/"
-        chmod +x "$PACKAGE_DIR/typistprison"
+        EXE_NAME=$(basename "$EXE_PATH")
+        chmod +x "$PACKAGE_DIR/$EXE_NAME"
+        
+        # If executable name is not 'typistprison', create a symlink or rename
+        if [ "$EXE_NAME" != "typistprison" ]; then
+          ln -sf "$EXE_NAME" "$PACKAGE_DIR/typistprison" || cp "$PACKAGE_DIR/$EXE_NAME" "$PACKAGE_DIR/typistprison"
+          chmod +x "$PACKAGE_DIR/typistprison"
+        fi
         
         # Find and copy Qt libraries
         if [ -n "$Qt6_DIR" ]; then
@@ -441,7 +503,8 @@ jobs:
         path: ${{ steps.create_package.outputs.package_path }}
     
     - name: Upload package to release
-      if: github.event_name == 'release'
+      if: github.event_name == 'release' && steps.create_package.outputs.package_path != ''
+      continue-on-error: true
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
