@@ -752,15 +752,15 @@ jobs:
         chmod +x "$APPDIR/usr/bin/$APP_NAME"
         
         # Create .desktop file
-        cat > "$APPDIR/usr/share/applications/${APP_NAME}.desktop" << EOF
+        cat > "$APPDIR/usr/share/applications/${APP_NAME}.desktop" << 'DESKTOP_EOF'
 [Desktop Entry]
 Type=Application
 Name=TypistPrison
 Comment=Typist Prison Application
-Exec=${APP_NAME}
-Icon=${APP_NAME}
+Exec=TypistPrison
+Icon=TypistPrison
 Categories=Utility;
-EOF
+DESKTOP_EOF
         
         # Copy icon if it exists, otherwise create a placeholder
         if [ -f "typistprison/icons/typrison_icon.png" ]; then
