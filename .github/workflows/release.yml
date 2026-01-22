@@ -449,6 +449,57 @@ jobs:
         arch: 'gcc_64'
         cache: false
     
+    - name: Capture Qt installation path
+      id: qt_path
+      run: |
+        QT_BASE=""
+        
+        # Try to get Qt path from environment variables
+        if [ -n "$Qt6_DIR" ] && [ -d "$Qt6_DIR" ]; then
+          QT_BASE=$(dirname "$Qt6_DIR")
+          echo "Found Qt via Qt6_DIR: $QT_BASE"
+        elif [ -n "$CMAKE_PREFIX_PATH" ] && [ -d "$CMAKE_PREFIX_PATH" ]; then
+          QT_BASE="$CMAKE_PREFIX_PATH"
+          echo "Found Qt via CMAKE_PREFIX_PATH: $QT_BASE"
+        else
+          # Try to find qmake
+          if command -v qmake &> /dev/null; then
+            QMAKE_PATH=$(which qmake)
+            QT_BASE=$(dirname $(dirname "$QMAKE_PATH"))
+            echo "Found Qt via qmake: $QT_BASE"
+          else
+            # Try common locations
+            for path in "$HOME/Qt/6.5.3/gcc_64" "/opt/qt/6.5.3/gcc_64"; do
+              if [ -d "$path" ] && [ -f "$path/bin/qmake" ]; then
+                QT_BASE="$path"
+                echo "Found Qt in: $QT_BASE"
+                break
+              fi
+            done
+          fi
+        fi
+        
+        # Verify we found Qt
+        if [ -z "$QT_BASE" ] || [ ! -d "$QT_BASE" ]; then
+          echo "ERROR: Could not determine Qt installation path"
+          echo "Environment:"
+          env | grep -i qt || true
+          echo "Qt6_DIR: $Qt6_DIR"
+          echo "CMAKE_PREFIX_PATH: $CMAKE_PREFIX_PATH"
+          exit 1
+        fi
+        
+        # Verify Qt installation has required directories
+        if [ ! -d "$QT_BASE/lib" ]; then
+          echo "ERROR: Qt installation at $QT_BASE does not have lib directory"
+          ls -la "$QT_BASE" || true
+          exit 1
+        fi
+        
+        # Save to output
+        echo "qt_base=$QT_BASE" >> $GITHUB_OUTPUT
+        echo "Qt installation path saved: $QT_BASE"
+    
     - name: Configure CMake
       run: |
         cd typistprison
@@ -551,14 +602,36 @@ jobs:
       run: |
         EXE_PATH="${{ steps.find_exe.outputs.exe_path }}"
         EXE_DIR="${{ steps.find_exe.outputs.exe_dir }}"
+        QT_BASE="${{ steps.qt_path.outputs.qt_base }}"
         
-        # Get Qt installation path
-        if [ -n "$Qt6_DIR" ]; then
-          QT_BASE=$(dirname "$Qt6_DIR")
-        elif [ -n "$CMAKE_PREFIX_PATH" ]; then
-          QT_BASE="$CMAKE_PREFIX_PATH"
-        else
-          echo "ERROR: Cannot find Qt installation path"
+        # Verify Qt path was captured
+        if [ -z "$QT_BASE" ] || [ ! -d "$QT_BASE" ]; then
+          echo "ERROR: Qt installation path not found or invalid"
+          echo "Qt path from step output: $QT_BASE"
+          echo "Trying to find Qt again..."
+          
+          # Fallback: try to find Qt again
+          if [ -n "$Qt6_DIR" ] && [ -d "$Qt6_DIR" ]; then
+            QT_BASE=$(dirname "$Qt6_DIR")
+          elif [ -n "$CMAKE_PREFIX_PATH" ] && [ -d "$CMAKE_PREFIX_PATH" ]; then
+            QT_BASE="$CMAKE_PREFIX_PATH"
+          elif command -v qmake &> /dev/null; then
+            QMAKE_PATH=$(which qmake)
+            QT_BASE=$(dirname $(dirname "$QMAKE_PATH"))
+          fi
+          
+          if [ -z "$QT_BASE" ] || [ ! -d "$QT_BASE" ]; then
+            echo "ERROR: Cannot find Qt installation path"
+            exit 1
+          fi
+        fi
+        
+        echo "Using Qt installation at: $QT_BASE"
+        
+        # Verify Qt installation has required directories
+        if [ ! -d "$QT_BASE/lib" ]; then
+          echo "ERROR: Qt installation at $QT_BASE does not have lib directory"
+          ls -la "$QT_BASE" || true
           exit 1
         fi
         
