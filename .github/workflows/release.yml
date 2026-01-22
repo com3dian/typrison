@@ -406,13 +406,13 @@ jobs:
         fi
         
         # Create a run script that sets up the environment
-        cat > "$PACKAGE_DIR/run.sh" << 'EOF'
-#!/bin/bash
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-export LD_LIBRARY_PATH="$SCRIPT_DIR/lib:$LD_LIBRARY_PATH"
-export QT_PLUGIN_PATH="$SCRIPT_DIR/plugins"
-"$SCRIPT_DIR/typistprison" "$@"
-EOF
+        {
+          echo '#!/bin/bash'
+          echo 'SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"'
+          echo 'export LD_LIBRARY_PATH="$SCRIPT_DIR/lib:$LD_LIBRARY_PATH"'
+          echo 'export QT_PLUGIN_PATH="$SCRIPT_DIR/plugins"'
+          echo '"$SCRIPT_DIR/typistprison" "$@"'
+        } > "$PACKAGE_DIR/run.sh"
         chmod +x "$PACKAGE_DIR/run.sh"
         
         # Create README
