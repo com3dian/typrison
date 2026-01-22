@@ -40,7 +40,7 @@
         <file>icons/windowminimize.png</file>
         <file>icons/windowmaximize.png</file>
         <file>icons/wikifile_icon.png</file>
-        <file>icons/*_icon.png</file>
+        <file>icons/wildcard_icon.png</file>
         <file>icons/save_file.png</file>
         <file>icons/save_file_hover.png</file>
         <file>icons/discard_file.png</file>

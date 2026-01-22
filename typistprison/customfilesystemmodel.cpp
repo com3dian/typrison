@@ -45,7 +45,7 @@ QVariant CustomFileSystemModel::data(const QModelIndex &index, int role) const {
                                                 [](QChar ch) { return ch == '*'; });
             }
             if (allAsterisks) {
-                return QIcon(":/icons/*_icon.png");
+                return QIcon(":/icons/wildcard_icon.png");
             } else {
                 return QIcon(":/icons/txt_icon.png");
             }
