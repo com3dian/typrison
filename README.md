@@ -6,6 +6,7 @@
 ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/com3dian/typrison/total?color=%2362C454)
 ![GitHub top language](https://img.shields.io/github/languages/top/com3dian/typrison?color=%23EE6A5E)
 ![GitHub Release](https://img.shields.io/github/v/release/com3dian/typrison?color=%2372bafc)
+![License](https://img.shields.io/github/license/com3dian/typrison?color=%23b4c1a1)
 
 
 ## 🚀 Features
@@ -37,3 +38,17 @@ Want to contribute? Follow these steps to get started:
 1. Fork the repository and clone it:
    ```bash
    git clone https://github.com/com3dian/typrison.git
+   ```
+
+## 📄 License
+
+This project is licensed under the **GNU Lesser General Public License v3.0 (LGPL-3.0)**.
+
+See the [LICENSE](LICENSE) file for details.
+
+The LGPL allows you to:
+- Use this software in proprietary applications
+- Modify and distribute the library
+- Link against the library dynamically
+
+For more information about LGPL-3.0, visit: https://www.gnu.org/licenses/lgpl-3.0.html
