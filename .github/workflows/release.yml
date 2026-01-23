@@ -452,12 +452,12 @@ jobs:
 
         # Create SFX configuration
         $configPath = Join-Path $buildRoot 'sfx_config.txt'
-        @"
-;!@Install@!UTF-8!
-Title=TypistPrison
-RunProgram=TypistPrison.exe
-;!@InstallEnd@!
-"@ | Set-Content -Encoding UTF8 $configPath
+        @(
+          ';!@Install@!UTF-8!'
+          'Title=TypistPrison'
+          'RunProgram=TypistPrison.exe'
+          ';!@InstallEnd@!'
+        ) | Set-Content -Encoding UTF8 $configPath
 
         # Concatenate stub + config + payload into final EXE
         $stubBytes    = [System.IO.File]::ReadAllBytes($sfxStub)
