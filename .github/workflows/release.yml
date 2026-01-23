@@ -399,12 +399,96 @@ jobs:
         
         echo "package_name=${PACKAGE_NAME}.zip" >> $GITHUB_OUTPUT
         echo "package_path=typistprison/build-release/${PACKAGE_NAME}.zip" >> $GITHUB_OUTPUT
+
+    - name: Create self-extracting EXE (portable)
+      id: create_sfx
+      shell: pwsh
+      run: |
+        $ref = $env:GITHUB_REF
+        $version = $ref -replace '^refs/tags/',''
+        if ([string]::IsNullOrEmpty($version) -or $version -eq $ref) { $version = 'dev' }
+
+        $packageName = "TypistPrison-$version-Windows"
+        $buildRoot   = "typistprison/build-release"
+        $packageDir  = Join-Path $buildRoot $packageName
+        $sfxName     = "TypistPrison-$version-Windows-portable.exe"
+        $sfxPath     = Join-Path $buildRoot $sfxName
+
+        Write-Host "Creating self-extracting EXE: $sfxPath"
+        Write-Host "Package directory: $packageDir"
+
+        if (-not (Test-Path $packageDir)) {
+          Write-Error "Package directory not found: $packageDir"
+          exit 1
+        }
+
+        # Ensure 7-Zip is available (for 7z.sfx and 7z.exe)
+        choco install 7zip -y | Out-Null
+
+        $sevenZipPath = Join-Path $env:ProgramFiles '7-Zip'
+        $sevenZipExe  = Join-Path $sevenZipPath '7z.exe'
+        $sfxStub      = Join-Path $sevenZipPath '7z.sfx'
+
+        if (-not (Test-Path $sevenZipExe)) {
+          Write-Error "7z.exe not found at $sevenZipExe"
+          exit 1
+        }
+        if (-not (Test-Path $sfxStub)) {
+          Write-Error "7z.sfx not found at $sfxStub"
+          exit 1
+        }
+
+        # Create 7z payload containing the contents of the package directory
+        Push-Location $packageDir
+        $payloadPath = Join-Path '..' 'payload.7z'
+        if (Test-Path $payloadPath) { Remove-Item $payloadPath -Force }
+        & $sevenZipExe a -t7z $payloadPath * | Write-Host
+        Pop-Location
+
+        if (-not (Test-Path $payloadPath)) {
+          Write-Error "Failed to create payload archive at $payloadPath"
+          exit 1
+        }
+
+        # Create SFX configuration
+        $configPath = Join-Path $buildRoot 'sfx_config.txt'
+        @"
+;!@Install@!UTF-8!
+Title=TypistPrison
+RunProgram=TypistPrison.exe
+;!@InstallEnd@!
+"@ | Set-Content -Encoding UTF8 $configPath
+
+        # Concatenate stub + config + payload into final EXE
+        $stubBytes    = [System.IO.File]::ReadAllBytes($sfxStub)
+        $cfgBytes     = [System.IO.File]::ReadAllBytes($configPath)
+        $payloadBytes = [System.IO.File]::ReadAllBytes($payloadPath)
+
+        $allBytes = New-Object byte[] ($stubBytes.Length + $cfgBytes.Length + $payloadBytes.Length)
+        [Array]::Copy($stubBytes,    0, $allBytes, 0,                         $stubBytes.Length)
+        [Array]::Copy($cfgBytes,     0, $allBytes, $stubBytes.Length,         $cfgBytes.Length)
+        [Array]::Copy($payloadBytes, 0, $allBytes, $stubBytes.Length + $cfgBytes.Length, $payloadBytes.Length)
+
+        [System.IO.File]::WriteAllBytes($sfxPath, $allBytes)
+
+        if (-not (Test-Path $sfxPath)) {
+          Write-Error "Failed to create self-extracting EXE at $sfxPath"
+          exit 1
+        }
+
+        Write-Host "Self-extracting EXE created at $sfxPath"
+
+        # Expose outputs for later steps
+        "sfx_name=$sfxName" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+        "sfx_path=$sfxPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
     
     - name: Upload Windows package artifact
       uses: actions/upload-artifact@v4
       with:
         name: windows-exe
-        path: ${{ steps.create_package.outputs.package_path }}
+        path: |
+          ${{ steps.create_package.outputs.package_path }}
+          ${{ steps.create_sfx.outputs.sfx_path }}
     
     - name: Debug Windows release upload
       if: github.event_name == 'release'
@@ -432,6 +516,18 @@ jobs:
         asset_path: ${{ steps.create_package.outputs.package_path }}
         asset_name: ${{ steps.create_package.outputs.package_name }}
         asset_content_type: application/zip
+
+    - name: Upload portable EXE to release
+      if: steps.create_sfx.outputs.sfx_path != ''
+      continue-on-error: false
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url || needs.create-release.outputs.upload_url }}
+        asset_path: ${{ steps.create_sfx.outputs.sfx_path }}
+        asset_name: ${{ steps.create_sfx.outputs.sfx_name }}
+        asset_content_type: application/vnd.microsoft.portable-executable
 
   build-linux:
     runs-on: ubuntu-latest
