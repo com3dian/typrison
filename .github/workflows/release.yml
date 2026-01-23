@@ -334,24 +334,22 @@ jobs:
       run: |
         EXE_PATH="${{ steps.find_exe.outputs.exe_path }}"
         EXE_DIR="${{ steps.find_exe.outputs.exe_dir }}"
-        
-        # Get Qt installation path
-        if [ -n "$Qt6_DIR" ]; then
-          QT_BASE=$(dirname "$Qt6_DIR")
-        elif [ -n "$CMAKE_PREFIX_PATH" ]; then
-          QT_BASE="$CMAKE_PREFIX_PATH"
-        else
-          echo "ERROR: Cannot find Qt installation path"
+        echo "Deploying Qt dependencies on Windows..."
+        echo "Executable path: $EXE_PATH"
+        echo "Executable dir: $EXE_DIR"
+        echo "Qt-related environment variables:"
+        env | grep -i qt || true
+        echo "PATH: $PATH"
+
+        # Use windeployqt to bundle all Qt dependencies.
+        # jurplel/install-qt-action adds the Qt bin directory (containing windeployqt) to PATH.
+        # First try with compiler runtime, then fall back to a simpler invocation.
+        windeployqt --release --compiler-runtime "$EXE_PATH" || \
+        windeployqt --release "$EXE_PATH" || {
+          echo "ERROR: windeployqt failed to run or was not found in PATH"
+          which windeployqt || echo "windeployqt not found in PATH"
           exit 1
-        fi
-        
-        echo "Qt base path: $QT_BASE"
-        echo "Deploying Qt dependencies..."
-        
-        # Use windeployqt to bundle all Qt dependencies
-        # windeployqt will copy all required Qt DLLs and plugins to the executable directory
-        windeployqt --release --compiler-runtime --qmldir "$QT_BASE/qml" "$EXE_PATH" || \
-        windeployqt --release "$EXE_PATH"
+        }
         
         echo "Deployed files:"
         ls -lh "$EXE_DIR" | head -30
