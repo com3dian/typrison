@@ -439,24 +439,46 @@ jobs:
         }
 
         # Create 7z payload containing the contents of the package directory
-        # Use absolute path for payload to avoid path resolution issues
-        $payloadPath = Join-Path $buildRoot 'payload.7z'
+        # Convert to absolute path to avoid path resolution issues
+        $payloadPath = [System.IO.Path]::GetFullPath((Join-Path $buildRoot 'payload.7z'))
         if (Test-Path $payloadPath) { Remove-Item $payloadPath -Force }
         
+        Write-Host "Creating payload archive at: $payloadPath"
         Push-Location $packageDir
-        & $sevenZipExe a -t7z $payloadPath * | Write-Host
+        $result = & $sevenZipExe a -t7z $payloadPath * 2>&1
+        $result | Write-Host
         Pop-Location
 
-        if (-not (Test-Path $payloadPath)) {
+        # Wait a moment for file system to sync, then check with retry
+        $maxRetries = 5
+        $retryCount = 0
+        $fileExists = $false
+        
+        while ($retryCount -lt $maxRetries -and -not $fileExists) {
+          Start-Sleep -Milliseconds 200
+          $fileExists = Test-Path $payloadPath
+          if (-not $fileExists) {
+            $retryCount++
+            Write-Host "Waiting for payload archive... (attempt $retryCount/$maxRetries)"
+          }
+        }
+
+        if (-not $fileExists) {
           Write-Error "Failed to create payload archive at $payloadPath"
           Write-Host "Current location: $(Get-Location)"
+          Write-Host "Build root exists: $(Test-Path $buildRoot)"
           Write-Host "Files in build root:"
-          Get-ChildItem $buildRoot | Select-Object -First 10 | Format-Table
+          if (Test-Path $buildRoot) {
+            Get-ChildItem $buildRoot | Select-Object -First 10 | Format-Table
+          }
+          Write-Host "Looking for payload.7z in build root..."
+          Get-ChildItem $buildRoot -Filter 'payload.7z' -ErrorAction SilentlyContinue | Format-Table
           exit 1
         }
         
         Write-Host "Payload archive created successfully at $payloadPath"
-        Write-Host "Payload size: $((Get-Item $payloadPath).Length) bytes"
+        $payloadInfo = Get-Item $payloadPath
+        Write-Host "Payload size: $($payloadInfo.Length) bytes ($([math]::Round($payloadInfo.Length / 1MB, 2)) MB)"
 
         # Create SFX configuration
         $configPath = Join-Path $buildRoot 'sfx_config.txt'
