@@ -372,8 +372,26 @@ jobs:
         fi
         PACKAGE_NAME="TypistPrison-${VERSION}-Windows"
         PACKAGE_DIR="typistprison/build-release/$PACKAGE_NAME"
+        EXE_DIR="${{ steps.find_exe.outputs.exe_dir }}"
+
         mkdir -p "$PACKAGE_DIR"
-        cp -r "${{ steps.find_exe.outputs.exe_dir }}"/* "$PACKAGE_DIR/"
+
+        echo "EXE_DIR: $EXE_DIR"
+        echo "PACKAGE_DIR: $PACKAGE_DIR"
+
+        # Copy everything from EXE_DIR into PACKAGE_DIR, but avoid copying PACKAGE_DIR into itself
+        echo "Copying files from EXE_DIR into PACKAGE_DIR (excluding PACKAGE_DIR itself)..."
+        for ITEM in "$EXE_DIR"/*; do
+          # Skip if source doesn't exist (globbing with no matches)
+          [ -e "$ITEM" ] || continue
+          # Skip the package directory itself if it lives inside EXE_DIR
+          if [ "$ITEM" = "$PACKAGE_DIR" ]; then
+            echo "Skipping self directory: $ITEM"
+            continue
+          fi
+          echo "Copying: $ITEM -> $PACKAGE_DIR/"
+          cp -r "$ITEM" "$PACKAGE_DIR/"
+        done
         
         # Create zip
         cd typistprison/build-release
