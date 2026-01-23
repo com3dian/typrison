@@ -439,16 +439,24 @@ jobs:
         }
 
         # Create 7z payload containing the contents of the package directory
-        Push-Location $packageDir
-        $payloadPath = Join-Path '..' 'payload.7z'
+        # Use absolute path for payload to avoid path resolution issues
+        $payloadPath = Join-Path $buildRoot 'payload.7z'
         if (Test-Path $payloadPath) { Remove-Item $payloadPath -Force }
+        
+        Push-Location $packageDir
         & $sevenZipExe a -t7z $payloadPath * | Write-Host
         Pop-Location
 
         if (-not (Test-Path $payloadPath)) {
           Write-Error "Failed to create payload archive at $payloadPath"
+          Write-Host "Current location: $(Get-Location)"
+          Write-Host "Files in build root:"
+          Get-ChildItem $buildRoot | Select-Object -First 10 | Format-Table
           exit 1
         }
+        
+        Write-Host "Payload archive created successfully at $payloadPath"
+        Write-Host "Payload size: $((Get-Item $payloadPath).Length) bytes"
 
         # Create SFX configuration
         $configPath = Join-Path $buildRoot 'sfx_config.txt'
