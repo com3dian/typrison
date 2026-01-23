@@ -5,6 +5,7 @@
 ![Issues](https://img.shields.io/github/issues/com3dian/typrison?color=%23F5BD4E)
 ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/com3dian/typrison/total?color=%2362C454)
 ![GitHub top language](https://img.shields.io/github/languages/top/com3dian/typrison?color=%23EE6A5E)
+![GitHub Release](https://img.shields.io/github/v/release/com3dian/typrison?color=%2372bafc)
 
 
 ## 🚀 Features
