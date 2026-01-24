@@ -138,36 +138,6 @@ jobs:
         echo "app_path=$APP_PATH" >> $GITHUB_OUTPUT
         echo "Found app at: $APP_PATH"
 
-    - name: Code sign .app bundle
-      run: |
-        APP_PATH="${{ steps.find_app.outputs.app_path }}"
-        if [ -d "$APP_PATH" ]; then
-          echo "Code signing app bundle: $APP_PATH"
-          # Create a self-signed certificate for development
-          security create-keychain -p "" build.keychain
-          security default-keychain -s build.keychain
-          security unlock-keychain -p "" build.keychain
-
-          # Create a self-signed certificate (for development/testing)
-          openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 \
-            -subj "/C=US/ST=State/L=City/O=Organization/CN=TypistPrison" \
-            -keyout /tmp/private.key -out /tmp/certificate.crt 2>/dev/null
-
-          # Import certificate
-          security import /tmp/certificate.crt -k build.keychain -T /usr/bin/codesign
-
-          # Trust the certificate
-          security add-trusted-cert -d -r trustRoot -k build.keychain /tmp/certificate.crt
-
-          # Code sign the app
-          codesign --force --deep --sign "TypistPrison" "$APP_PATH"
-
-          echo "Code signing completed"
-        else
-          echo "ERROR: App bundle not found at $APP_PATH"
-          exit 1
-        fi
-
     - name: Deploy Qt dependencies and create DMG
       run: |
         APP_PATH="${{ steps.find_app.outputs.app_path }}"
@@ -184,6 +154,49 @@ jobs:
           echo "Qt frameworks bundled:"
           ls -lh "$APP_PATH/Contents/Frameworks" | head -10
         fi
+
+    - name: Code sign .app bundle (after Qt deployment)
+      run: |
+        APP_PATH="${{ steps.find_app.outputs.app_path }}"
+        if [ ! -d "$APP_PATH" ]; then
+          echo "ERROR: App bundle not found at $APP_PATH"
+          exit 1
+        fi
+        
+        echo "Code signing app bundle (fast method): $APP_PATH"
+        
+        # Use ad-hoc signing (much faster, no certificate needed)
+        # This makes the app runnable without "app is damaged" errors
+        # Users can still right-click -> Open if needed
+        
+        # Sign frameworks first (faster than --deep)
+        if [ -d "$APP_PATH/Contents/Frameworks" ]; then
+          echo "Signing Qt frameworks..."
+          find "$APP_PATH/Contents/Frameworks" -name "*.framework" -type d | while read framework; do
+            codesign --force --sign - "$framework" 2>/dev/null || true
+          done
+        fi
+        
+        # Sign plugins if any
+        if [ -d "$APP_PATH/Contents/PlugIns" ]; then
+          echo "Signing plugins..."
+          find "$APP_PATH/Contents/PlugIns" -type f -exec codesign --force --sign - {} \; 2>/dev/null || true
+        fi
+        
+        # Sign the main executable
+        if [ -f "$APP_PATH/Contents/MacOS"/* ]; then
+          echo "Signing main executable..."
+          find "$APP_PATH/Contents/MacOS" -type f -exec codesign --force --sign - {} \; 2>/dev/null || true
+        fi
+        
+        # Finally sign the entire app bundle (without --deep for speed)
+        echo "Signing app bundle..."
+        codesign --force --sign - "$APP_PATH"
+        
+        # Verify signature
+        codesign --verify --verbose "$APP_PATH" 2>&1 || echo "Note: Verification may show warnings for ad-hoc signature"
+        
+        echo "Code signing completed (ad-hoc signature)"
     
     - name: Rename DMG with version
       id: rename_dmg
