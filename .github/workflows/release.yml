@@ -183,27 +183,31 @@ jobs:
           find "$APP_PATH/Contents/PlugIns" -type f -exec codesign --force --sign - {} \; 2>/dev/null || true
         fi
         
-        # Sign the main executable (check if MacOS directory exists and has files)
+        # Fix symlinks in MacOS directory - codesign requires regular files, not symlinks
         if [ -d "$APP_PATH/Contents/MacOS" ]; then
           echo "Checking MacOS directory contents..."
           ls -la "$APP_PATH/Contents/MacOS/"
           
-          # Find and sign all regular files (not symlinks) in MacOS directory
-          echo "Signing main executable(s)..."
-          find "$APP_PATH/Contents/MacOS" -type f ! -type l -exec codesign --force --sign - {} \; 2>/dev/null || true
-        fi
-        
-        # Check for symlinks in MacOS and handle them
-        if [ -d "$APP_PATH/Contents/MacOS" ]; then
+          # Replace any symlinks with actual files
           find "$APP_PATH/Contents/MacOS" -type l | while read symlink; do
-            echo "Found symlink: $symlink -> $(readlink "$symlink")"
-            # Resolve symlink and sign the actual file
-            TARGET=$(readlink -f "$symlink" 2>/dev/null || readlink "$symlink")
-            if [ -f "$TARGET" ] && [ ! -L "$TARGET" ]; then
-              echo "Signing symlink target: $TARGET"
-              codesign --force --sign - "$TARGET" 2>/dev/null || true
+            TARGET=$(readlink "$symlink")
+            # If target is relative, resolve it relative to symlink's directory
+            if [[ "$TARGET" != /* ]]; then
+              SYMLINK_DIR=$(dirname "$symlink")
+              TARGET="$SYMLINK_DIR/$TARGET"
+            fi
+            
+            if [ -f "$TARGET" ]; then
+              echo "Replacing symlink $symlink with actual file from $TARGET"
+              rm "$symlink"
+              cp "$TARGET" "$symlink"
+              chmod +x "$symlink"
             fi
           done
+          
+          # Now sign all executables in MacOS directory
+          echo "Signing main executable(s)..."
+          find "$APP_PATH/Contents/MacOS" -type f -exec codesign --force --sign - {} \; 2>/dev/null || true
         fi
         
         # Finally sign the entire app bundle (without --deep for speed)
