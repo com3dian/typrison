@@ -183,15 +183,38 @@ jobs:
           find "$APP_PATH/Contents/PlugIns" -type f -exec codesign --force --sign - {} \; 2>/dev/null || true
         fi
         
-        # Sign the main executable
-        if [ -f "$APP_PATH/Contents/MacOS"/* ]; then
-          echo "Signing main executable..."
-          find "$APP_PATH/Contents/MacOS" -type f -exec codesign --force --sign - {} \; 2>/dev/null || true
+        # Sign the main executable (check if MacOS directory exists and has files)
+        if [ -d "$APP_PATH/Contents/MacOS" ]; then
+          echo "Checking MacOS directory contents..."
+          ls -la "$APP_PATH/Contents/MacOS/"
+          
+          # Find and sign all regular files (not symlinks) in MacOS directory
+          echo "Signing main executable(s)..."
+          find "$APP_PATH/Contents/MacOS" -type f ! -type l -exec codesign --force --sign - {} \; 2>/dev/null || true
+        fi
+        
+        # Check for symlinks in MacOS and handle them
+        if [ -d "$APP_PATH/Contents/MacOS" ]; then
+          find "$APP_PATH/Contents/MacOS" -type l | while read symlink; do
+            echo "Found symlink: $symlink -> $(readlink "$symlink")"
+            # Resolve symlink and sign the actual file
+            TARGET=$(readlink -f "$symlink" 2>/dev/null || readlink "$symlink")
+            if [ -f "$TARGET" ] && [ ! -L "$TARGET" ]; then
+              echo "Signing symlink target: $TARGET"
+              codesign --force --sign - "$TARGET" 2>/dev/null || true
+            fi
+          done
         fi
         
         # Finally sign the entire app bundle (without --deep for speed)
         echo "Signing app bundle..."
-        codesign --force --sign - "$APP_PATH"
+        codesign --force --sign - "$APP_PATH" 2>&1 || {
+          echo "Warning: codesign had issues, trying with --deep..."
+          codesign --force --deep --sign - "$APP_PATH" 2>&1 || {
+            echo "ERROR: Code signing failed"
+            exit 1
+          }
+        }
         
         # Verify signature
         codesign --verify --verbose "$APP_PATH" 2>&1 || echo "Note: Verification may show warnings for ad-hoc signature"
