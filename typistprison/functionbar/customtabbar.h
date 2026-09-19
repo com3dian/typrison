@@ -22,6 +22,8 @@ class CustomTabBar : public QTabBar {
 public:
     explicit CustomTabBar(QWidget *parent = nullptr);
     ~CustomTabBar(); // Added destructor declaration
+    bool isTabInsertionAnimating() const;
+    bool isRightmostVisibleTabSelected() const;
 
 public slots:
     // Slot to trigger and manage the tab insertion animation
@@ -33,7 +35,9 @@ protected:
     void mouseMoveEvent(QMouseEvent *event) override;     // Added for hover detection
     void mousePressEvent(QMouseEvent *event) override;    // Added for click detection
     void leaveEvent(QEvent *event) override;              // Added to reset hover state
+    void resizeEvent(QResizeEvent *event) override;
     QSize tabSizeHint(int index) const override;          // Added to ensure space for close icon
+    QSize minimumTabSizeHint(int index) const override;
 
 private slots:
     void customizeScrollButtons();
@@ -64,13 +68,17 @@ private:
     QPixmap closeIcon;
     QPixmap closeIconHover;
     int hoveredCloseButtonIndex; // Index of tab whose close button is hovered, -1 if none
+    QWidget *topLeftCurveWidget;
+    QWidget *topRightCurveWidget;
     
     QRect getCloseButtonRect(int tabIndex) const; // Helper to calculate close button rect
+    QRect tabsViewportRect() const;
+    void positionCurveWidgets();
 
     // Constants for close button appearance
     static const int CLOSE_ICON_SIZE = 16;
     static const int CLOSE_ICON_MARGIN_RIGHT = 16; // Margin from the right of the tab
-    static const int CLOSE_ICON_TEXT_PADDING = 64; // Padding between text and close icon - Increased from 4 to 8
+    static const int CLOSE_ICON_TEXT_PADDING = 32; // Padding between text and close icon
 };
 
 #endif // CUSTOMTABBAR_H
