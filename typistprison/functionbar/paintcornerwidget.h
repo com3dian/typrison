@@ -26,9 +26,18 @@ private:
     QPoint dragStartPosition;
     
 public:
-    explicit PaintCornerWidget(QWidget *parent = nullptr) : QWidget(parent), isDragging(false) {
+    explicit PaintCornerWidget(QWidget *parent = nullptr) : QWidget(parent), isFullBlackMode(true), isDragging(false) {
         // Set a fixed width (change 150 to your desired width)
         setFixedWidth(24);
+    }
+
+    void setFullBlackMode(bool enabled) {
+        if (isFullBlackMode == enabled) {
+            return;
+        }
+
+        isFullBlackMode = enabled;
+        update();
     }
 
 protected:
@@ -37,6 +46,11 @@ protected:
         Q_UNUSED(event);
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing);
+
+        if (isFullBlackMode) {
+            painter.fillRect(rect(), QColor("#1F2020"));
+            return;
+        }
 
         // Normal complex path drawing
         int slant = 2;  // Adjust this to control the slant amount

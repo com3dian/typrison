@@ -8,6 +8,7 @@ FunctionBar::FunctionBar(QWidget *parent, CustomTabWidget *syncedTabWidget)
     , syncedTabWidget(syncedTabWidget)
     , isExpanded(false)
     , isDragging(false)
+    , paintCornerWidgetOpacityEffect(nullptr)
 {
     // Main container layout
     mainLayout = new QHBoxLayout(this);
@@ -36,7 +37,7 @@ FunctionBar::FunctionBar(QWidget *parent, CustomTabWidget *syncedTabWidget)
     transparentLeftWidget->setVisible(false);
 
     paintCornerWidget = new PaintCornerWidget(this);
-    paintCornerWidget->setVisible(false); // Start hidden
+    paintCornerWidget->setVisible(true);
 
     TrafficLightWidget *trafficLightWidget = new TrafficLightWidget(this);
     connect(trafficLightWidget, &TrafficLightWidget::minimalButtonClicked, this, &FunctionBar::minimalButtonClicked);
@@ -93,6 +94,8 @@ void FunctionBar::onTabInserted(int index, const QString &label) {
         // Insert the tab
         tabBar->insertTab(index, label);
         // tabBar->setTabButton(index, QTabBar::RightSide, closeButton); // REMOVED
+
+        paintCornerWidget->setFullBlackMode(true);
         
         // Trigger the insertion animation for the new tab
         if (auto* customTabBar = qobject_cast<CustomTabBar*>(tabBar)) {
@@ -167,6 +170,7 @@ void FunctionBar::setupTabBar() {
     // Optional: Customize tab behavior or appearance
     tabBar->setExpanding(true);  // Tabs expand to fill available space
     tabBar->setMovable(true);
+    tabBar->setUsesScrollButtons(true);
 
     connect(syncedTabWidget, &CustomTabWidget::tabInsertedSignal, this, &FunctionBar::onTabInserted);
     connect(syncedTabWidget, &CustomTabWidget::tabClosedFromSyncedTabWidgetSignal, this, &FunctionBar::onTabClosedFromSyncedWidget);
@@ -340,41 +344,25 @@ QList<QPushButton*> FunctionBar::getAllButtons() const {
 }
 
 void FunctionBar::showPaintCornerWidget() {
-    if (isScrollbuttonActive) {
+    if (tabBar->isTabInsertionAnimating()) {
+        paintCornerWidget->setFullBlackMode(true);
         return;
     }
-    paintCornerWidget->setVisible(true);
+    paintCornerWidget->setFullBlackMode(!tabBar->isRightmostVisibleTabSelected());
 }
 
 void FunctionBar::hidePaintCornerWidget() {
-    if (isScrollbuttonActive) {
-        return;
+    if (paintCornerWidgetOpacityEffect) {
+        paintCornerWidgetOpacityEffect->setOpacity(1.0);
+        paintCornerWidgetOpacityEffect->setEnabled(false);
     }
-
-    paintCornerWidget->setVisible(false);
+    paintCornerWidget->setFullBlackMode(tabBar->isTabInsertionAnimating()
+                                        || !tabBar->isRightmostVisibleTabSelected());
 }
 
 void FunctionBar::animatePaintRightEdgeWidget() {
-    // Delay in milliseconds (e.g., 500ms = 0.5 seconds)
-    if (!paintCornerWidget) return; // Guard against widget being deleted during delay
-
-    paintCornerWidgetOpacityEffect = new QGraphicsOpacityEffect(this); // Create the effect
-    paintCornerWidget->setGraphicsEffect(paintCornerWidgetOpacityEffect); // Apply to the widget
-    paintCornerWidgetOpacityEffect->setOpacity(0.0); // Start fully transparent
-
-    int delayMilliseconds = 200; // You can adjust this value
-
-    QTimer::singleShot(delayMilliseconds, this, [this]() {
-        // This code will execute after delayMilliseconds
-        if (!paintCornerWidget) return; // Guard against widget being deleted during delay
-
-        QPropertyAnimation *animation = new QPropertyAnimation(paintCornerWidgetOpacityEffect, "opacity", this);
-        animation->setDuration(100); // Duration of the fade-in animation
-        animation->setStartValue(paintCornerWidgetOpacityEffect->opacity()); // Start from current opacity (should be 0.0 if just made visible)
-        animation->setEndValue(1.0);   // Fade to fully opaque
-        animation->setEasingCurve(QEasingCurve::InOutQuad);
-        animation->start(QAbstractAnimation::DeleteWhenStopped);
-    });
+    paintCornerWidget->setFullBlackMode(tabBar->isTabInsertionAnimating()
+                                        || !tabBar->isRightmostVisibleTabSelected());
 }
 
 void FunctionBar::showPaintLeftEdgeWidget() {
@@ -388,13 +376,20 @@ void FunctionBar::hidePaintLeftEdgeWidget() {
 }
 
 void FunctionBar::hideBothPaintCornerWidget() {
-    paintCornerWidget->setVisible(false);
+    if (paintCornerWidgetOpacityEffect) {
+        paintCornerWidgetOpacityEffect->setOpacity(1.0);
+        paintCornerWidgetOpacityEffect->setEnabled(false);
+    }
+    paintCornerWidget->setFullBlackMode(tabBar->isTabInsertionAnimating()
+                                        || !tabBar->isRightmostVisibleTabSelected());
 
     isScrollbuttonActive = true;
 }
 
 void FunctionBar::notHideBothPaintCornerWidget() {
     isScrollbuttonActive = false;
+    paintCornerWidget->setFullBlackMode(tabBar->isTabInsertionAnimating()
+                                        || !tabBar->isRightmostVisibleTabSelected());
 }
 
 void FunctionBar::mousePressEvent(QMouseEvent *event) {

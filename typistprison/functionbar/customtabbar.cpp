@@ -12,14 +12,149 @@ are synced to this tabbar, and vice versa.
 
 #include "customtabbar.h"
 #include <QMouseEvent> // For mouse events
+#include <QProxyStyle>
+#include <QPainterPathStroker>
+
+namespace {
+// Let Qt use the same left-hand geometry for layout, scrolling and hit testing.
+class LeftScrollButtonsStyle : public QProxyStyle {
+public:
+    int pixelMetric(PixelMetric metric, const QStyleOption *option,
+                    const QWidget *widget) const override {
+        if (metric == PM_TabBarScrollButtonWidth)
+            return 22;
+        return QProxyStyle::pixelMetric(metric, option, widget);
+    }
+
+    QRect subElementRect(SubElement element, const QStyleOption *option,
+                         const QWidget *widget) const override {
+        if (element == SE_TabBarScrollLeftButton || element == SE_TabBarScrollRightButton) {
+            const int buttonWidth = pixelMetric(PM_TabBarScrollButtonWidth, option, widget);
+            const int offset = element == SE_TabBarScrollRightButton ? buttonWidth : 0;
+            // return QRect(option->rect.left() + offset, option->rect.top(),
+            //              buttonWidth, option->rect.height());
+            const int verticalMargin = 8; // Top and bottom margin, in pixels
+            return QRect(option->rect.left() + offset,
+                         option->rect.top() + verticalMargin,
+                         buttonWidth,
+                         qMax(0, option->rect.height() - 2 * verticalMargin));
+        }
+        return QProxyStyle::subElementRect(element, option, widget);
+    }
+};
+
+class TopLeftTabCurveWidget : public QWidget {
+public:
+    explicit TopLeftTabCurveWidget(QWidget *parent = nullptr)
+        : QWidget(parent) {
+        setObjectName("TopLeftTabCurveWidget");
+        setFixedSize(32, 48);
+        setAttribute(Qt::WA_TransparentForMouseEvents);
+        setAttribute(Qt::WA_TranslucentBackground);
+    }
+
+protected:
+    void paintEvent(QPaintEvent *event) override {
+        Q_UNUSED(event);
+
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
+
+        const int radius = 4;
+        const QRect widgetRect = rect();
+        const int xLeftTopCorner = widgetRect.left() + 2 * radius;
+        const int xLeftBottomCorner = widgetRect.left();
+        const int yTopCorner = widgetRect.top() + 9;
+        const int yBottomCorner = widgetRect.bottom() + 2;
+
+        QPainterPath areaUnderCurve;
+        areaUnderCurve.moveTo(xLeftBottomCorner, yBottomCorner);
+        areaUnderCurve.quadTo(xLeftTopCorner, yBottomCorner,
+                              xLeftTopCorner, yBottomCorner - 2 * radius);
+        areaUnderCurve.lineTo(xLeftTopCorner, yTopCorner + radius);
+        areaUnderCurve.quadTo(xLeftTopCorner, yTopCorner,
+                              xLeftTopCorner + radius, yTopCorner);
+        areaUnderCurve.lineTo(widgetRect.right() + 1, yTopCorner);
+        areaUnderCurve.lineTo(widgetRect.right() + 1, yBottomCorner);
+        areaUnderCurve.closeSubpath();
+
+        QPainterPath areaOutsideCurve;
+        areaOutsideCurve.addRect(QRectF(widgetRect));
+        areaOutsideCurve = areaOutsideCurve.subtracted(areaUnderCurve);
+
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(QColor("#1F2020"));
+        painter.drawPath(areaOutsideCurve);
+    }
+};
+
+class TopRightTabCurveWidget : public QWidget {
+public:
+    explicit TopRightTabCurveWidget(QWidget *parent = nullptr)
+        : QWidget(parent) {
+        setObjectName("TopRightTabCurveWidget");
+        setFixedSize(24, 48);
+        setAttribute(Qt::WA_TransparentForMouseEvents);
+        setAttribute(Qt::WA_TranslucentBackground);
+    }
+
+protected:
+    void paintEvent(QPaintEvent *event) override {
+        Q_UNUSED(event);
+
+        QPainter painter(this);
+
+        painter.setRenderHint(QPainter::Antialiasing);
+        const int slant = 2;
+        const int radius = 4;
+        const int moveLeft = 2;
+        const QRect widgetRect = rect();
+        const int xRightTopCorner = widgetRect.right() - slant - moveLeft;
+        const int xRightBottomCorner = widgetRect.right() + slant - moveLeft;
+        const int yTopCorner = widgetRect.top() + 9;
+        const int yBottomCorner = widgetRect.bottom() + 2;
+
+        QPainterPath areaUnderCurve;
+        areaUnderCurve.moveTo(widgetRect.left(), yBottomCorner);
+        areaUnderCurve.lineTo(widgetRect.left(), yTopCorner);
+        areaUnderCurve.lineTo(xRightTopCorner - 2.5 * radius, yTopCorner);
+        areaUnderCurve.quadTo(xRightTopCorner - 1.75 * radius, yTopCorner,
+                              xRightTopCorner - 1.25 * radius, yTopCorner + radius);
+        areaUnderCurve.lineTo(xRightBottomCorner + 1.25 * radius,
+                              yBottomCorner - radius);
+        areaUnderCurve.quadTo(xRightBottomCorner + 2 * radius, yBottomCorner,
+                              xRightBottomCorner + 3 * radius, yBottomCorner);
+        areaUnderCurve.closeSubpath();
+
+        // The selected tab also has a 2 px stroke centered on its path.
+        // Keep that stroke and its antialiased fringe clear of the mask.
+        QPainterPathStroker border;
+        border.setWidth(2.0 + 1.0 / devicePixelRatioF());
+        areaUnderCurve = areaUnderCurve.united(border.createStroke(areaUnderCurve));
+
+        QPainterPath areaOutsideCurve;
+        areaOutsideCurve.addRect(QRectF(widgetRect));
+        areaOutsideCurve = areaOutsideCurve.subtracted(areaUnderCurve);
+
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(QColor("#1F2020"));
+        painter.drawPath(areaOutsideCurve);
+    }
+};
+}
 
 CustomTabBar::CustomTabBar(QWidget *parent) 
     : QTabBar(parent),
       insertingTabIndex(-1),                      
       insertAnimationProgressValue(1.0),
       tabInsertAnimation(nullptr),                
-      hoveredCloseButtonIndex(-1)                 
+      hoveredCloseButtonIndex(-1),
+      topLeftCurveWidget(new TopLeftTabCurveWidget(this)),
+      topRightCurveWidget(new TopRightTabCurveWidget(this))
 {
+    auto *scrollStyle = new LeftScrollButtonsStyle;
+    scrollStyle->setParent(this);
+    setStyle(scrollStyle);
     this->setContentsMargins(0, 0, 0, 0);
     this->setStyleSheet("QTabBar::tab { margin: 0px; padding: 0px; }"); // Base style
 
@@ -30,6 +165,12 @@ CustomTabBar::CustomTabBar(QWidget *parent)
     closeIconHover.load(":/icons/tab_hover.png");  
     
     setMouseTracking(true); // Enable mouse move events without button press
+
+    positionCurveWidgets();
+    topLeftCurveWidget->show();
+    topLeftCurveWidget->raise();
+    topRightCurveWidget->show();
+    topRightCurveWidget->raise();
 }
 
 // Add destructor to manage tabInsertAnimation if necessary
@@ -55,6 +196,10 @@ qreal CustomTabBar::insertAnimationProgress() const {
     return insertAnimationProgressValue;
 }
 
+bool CustomTabBar::isTabInsertionAnimating() const {
+    return insertingTabIndex >= 0;
+}
+
 // Add public slot to start the animation
 void CustomTabBar::animateTabInsertion(int index, int durationMs) {
     if (tabInsertAnimation) {
@@ -75,7 +220,6 @@ void CustomTabBar::animateTabInsertion(int index, int durationMs) {
     connect(tabInsertAnimation, &QPropertyAnimation::finished, this, &CustomTabBar::onAnimationFinished); // Corrected
 
     tabInsertAnimation->start(QAbstractAnimation::DeleteWhenStopped);
-    emit animateTabInsertionFinished();
 }
 
 // Add slot to handle animation finished
@@ -84,35 +228,69 @@ void CustomTabBar::onAnimationFinished() {
     // insertAnimationProgressValue is now 1.0
     tabInsertAnimation = nullptr;
     update(); // Ensure a final repaint with the tab fully visible and no animation logic active
+    emit animateTabInsertionFinished();
 }
 
 /*
-Hide default scroll button for tabbar
+Style the overflow controls without hiding them.
 */
 void CustomTabBar::customizeScrollButtons() {
     // Retrieve the scroll buttons by their object names
     QToolButton *leftButton = findChild<QToolButton*>("ScrollLeftButton");
     QToolButton *rightButton = findChild<QToolButton*>("ScrollRightButton");
 
-    QString noStyle = "QToolButton { border: none; background-color: transparent; } "
-                      "QToolButton:hover { background-color: transparent; }";
+    QString noStyle = "QToolButton { border: none; background-color: transparent; padding: 0px; } "
+                      "QToolButton:hover { background-color: #2c2c2c; border-radius: 4px; }";
 
     if (leftButton) {
-        // Optionally customize appearance
-        leftButton->setIconSize(QSize(0, 0));
-        leftButton->setFixedSize(0, 0);
         leftButton->setStyleSheet(noStyle);
 
         // Install event filter to detect visibility changes
         leftButton->installEventFilter(this);
     }
     if (rightButton) {
-        rightButton->setIconSize(QSize(0, 0));
-        rightButton->setFixedSize(QSize(0, 0));
         rightButton->setStyleSheet(noStyle);
 
         rightButton->installEventFilter(this);
     }
+
+    positionCurveWidgets();
+}
+
+QRect CustomTabBar::tabsViewportRect() const {
+    QRect viewport = rect();
+    for (const auto *button : findChildren<QToolButton *>()) {
+        if (button->isVisible() && (button->objectName() == "ScrollLeftButton"
+                                   || button->objectName() == "ScrollRightButton")) {
+            viewport.setLeft(qMax(viewport.left(), button->geometry().right() + 1));
+        }
+    }
+    return viewport;
+}
+
+void CustomTabBar::positionCurveWidgets() {
+    const int tabsLeft = tabsViewportRect().left();
+    const int leftCurveX = tabsLeft == rect().left() ? tabsLeft - 8 : tabsLeft;
+    topLeftCurveWidget->move(leftCurveX, 0);
+    topRightCurveWidget->move(qMax(0, width() - topRightCurveWidget->width()), 0);
+    topLeftCurveWidget->raise();
+    topRightCurveWidget->raise();
+}
+
+bool CustomTabBar::isRightmostVisibleTabSelected() const {
+    const QRect viewport = tabsViewportRect();
+    int rightmostVisibleIndex = -1;
+    int rightmostEdge = viewport.left() - 1;
+
+    for (int i = 0; i < count(); ++i) {
+        const QRect visiblePart = tabRect(i).intersected(viewport);
+        if (!visiblePart.isEmpty() && visiblePart.right() > rightmostEdge) {
+            rightmostVisibleIndex = i;
+            rightmostEdge = visiblePart.right();
+        }
+    }
+
+    return rightmostVisibleIndex >= 0 && currentIndex() == rightmostVisibleIndex;
 }
 
 // Helper function to calculate the close button rectangle for a given tab
@@ -125,7 +303,8 @@ QRect CustomTabBar::getCloseButtonRect(int tabIndex) const {
     int verticalOffset = 2; // Pixels to lower the icon
     int y = r.top() + (r.height() - CLOSE_ICON_SIZE) / 2 + verticalOffset;
     int x = r.right() - CLOSE_ICON_MARGIN_RIGHT - CLOSE_ICON_SIZE;
-    return QRect(x, y, CLOSE_ICON_SIZE, CLOSE_ICON_SIZE);
+    const QRect closeRect(x, y, CLOSE_ICON_SIZE, CLOSE_ICON_SIZE);
+    return tabsViewportRect().contains(closeRect) ? closeRect : QRect();
 }
 
 // Override tabSizeHint to make enough space for text and the close icon
@@ -150,13 +329,14 @@ QSize CustomTabBar::tabSizeHint(int index) const {
     // Get the base size hint from QTabBar (primarily for height and any style-driven minimums)
     QSize hintedSize = QTabBar::tabSizeHint(index);
     
-    // Set our calculated width, ensuring it's not less than any minimum width from the style,
-    // but prioritizing our calculation if it's larger.
-    hintedSize.setWidth(qMax(hintedSize.width(), totalWidth));
+    hintedSize.setWidth(qBound(110, totalWidth, 220));
     
-    // You might want to add a small extra buffer if things still feel too tight, e.g.:
-    // hintedSize.rwidth() += 4; // Optional small buffer
+    return hintedSize;
+}
 
+QSize CustomTabBar::minimumTabSizeHint(int index) const {
+    QSize hintedSize = QTabBar::minimumTabSizeHint(index);
+    hintedSize.setWidth(110);
     return hintedSize;
 }
 
@@ -164,6 +344,7 @@ void CustomTabBar::paintEvent(QPaintEvent *event) {
     QStylePainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);  // Smoother edges
     painter.setRenderHint(QPainter::SmoothPixmapTransform); // Higher quality pixmap scaling
+    painter.setClipRect(tabsViewportRect());
 
     for (int i = 0; i < count(); ++i) {
         QStyleOptionTab opt;
@@ -177,7 +358,7 @@ void CustomTabBar::paintEvent(QPaintEvent *event) {
             QRect animatedClipRect = currentTabRect;
             animatedClipRect.setWidth(qRound(currentTabRect.width() * insertAnimationProgressValue));
             if (animatedClipRect.width() < 1) animatedClipRect.setWidth(1);
-            painter.setClipRect(animatedClipRect);
+            painter.setClipRect(animatedClipRect, Qt::IntersectClip);
         }
 
         // Draw tab background and border (your existing logic)
@@ -197,7 +378,9 @@ void CustomTabBar::paintEvent(QPaintEvent *event) {
             int xRightTopCorner = currentTabRect.right() - slant - moveLeft;
             int xRightBottomCorner = currentTabRect.right() + slant - moveLeft;
             
-            if (i == count() - 1) {
+            // Re-evaluate on every repaint so overflow scrolling and tab moves
+            // immediately update the right corner.
+            if (isRightmostVisibleTabSelected()) {
                 emit lastTabFocus();
             } else {
                 emit lastTabNoFocus();
@@ -244,11 +427,6 @@ void CustomTabBar::paintEvent(QPaintEvent *event) {
             }
         }
 
-        // Draw the tab text within the tab boundaries
-        painter.setPen(QColor("#BDBDBD"));
-        // Use currentTabRect here
-        painter.drawText(currentTabRect.adjusted(16, 2, -16, 0), Qt::AlignLeft | Qt::AlignVCenter, tabText(i));
-    
         // Calculate rect for text, leaving space for the close icon
         QRect textDrawingRect = currentTabRect;
         // Adjust right side for close icon, its margin, and padding
@@ -304,6 +482,10 @@ void CustomTabBar::mouseMoveEvent(QMouseEvent *event) {
 }
 
 void CustomTabBar::mousePressEvent(QMouseEvent *event) {
+    if (!tabsViewportRect().contains(event->pos())) {
+        event->accept();
+        return;
+    }
     if (event->button() == Qt::LeftButton) {
         for (int i = 0; i < count(); ++i) {
             if (getCloseButtonRect(i).contains(event->pos())) {
@@ -324,6 +506,11 @@ void CustomTabBar::leaveEvent(QEvent *event) {
     QTabBar::leaveEvent(event); // Call base implementation
 }
 
+void CustomTabBar::resizeEvent(QResizeEvent *event) {
+    QTabBar::resizeEvent(event);
+    positionCurveWidgets();
+}
+
 bool CustomTabBar::eventFilter(QObject *obj, QEvent *event) {
     // Check if the object is one of the scroll buttons
     if (obj->objectName() == "ScrollLeftButton" || obj->objectName() == "ScrollRightButton") {
@@ -332,6 +519,7 @@ bool CustomTabBar::eventFilter(QObject *obj, QEvent *event) {
         } else if (event->type() == QEvent::Hide) {
             emit scrollbuttonInactivate();
         }
+        QTimer::singleShot(0, this, [this]() { positionCurveWidgets(); });
     }
     // Ensure the base class processes the event too
     return QTabBar::eventFilter(obj, event);
