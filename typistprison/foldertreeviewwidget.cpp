@@ -251,6 +251,7 @@ void FolderTreeViewWidget::setupFileTree() {
         "QTreeView { "
         "    background-color: transparent; "
         "    border: none; "
+        "    outline: none; "
         "    color: #BDBDBD;"
         "}"
         "QTreeView::item { "

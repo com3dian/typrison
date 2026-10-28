@@ -24,6 +24,7 @@ The main window widget holding everthing in the app.
 #include <QNetworkRequest>
 #include <QNetworkReply>
 #include <QUrl>
+#include <QVariantAnimation>
 
 // Add this to your MainWindow constructor initialization list
 MainWindow::MainWindow(QWidget *parent)
@@ -60,6 +61,7 @@ MainWindow::MainWindow(QWidget *parent)
     // Create a wrapper for the splitter (to ensure full expansion)
     splitterContainer = new ProgressBorderWidget(mainContainer, prisonerManager);
     splitterContainer->setObjectName("splitterContainer");  // Add this line
+    splitterContainer->setMouseTracking(true);
     splitterContainer->setStyleSheet(
         "QWidget#splitterContainer {"  // Target only this specific widget
         "    background-color: #1F2020;"
@@ -196,6 +198,35 @@ MainWindow::MainWindow(QWidget *parent)
     // set up side panel button
     sidePanelButton->setEnabled(false);
     connect(sidePanelButton, &QPushButton::clicked, this, &MainWindow::toggleFileTreeView);
+    connect(centralSplitter, &QSplitter::splitterMoved, this, [this](int, int) {
+        if (centralSplitter->sizes().value(0) == 0) {
+            sidePanelButton->setStyleSheet(
+                "QPushButton {"
+                "border: none;"
+                "border-image: url(:/icons/sidebar_silent.png) 0 0 0 0 stretch stretch;"
+                "}"
+                "QPushButton:hover {"
+                "border-image: url(:/icons/sidebar_hover.png) 0 0 0 0 stretch stretch;"
+                "}"
+                "QPushButton:pressed {"
+                "border-image: url(:/icons/sidebar_clicked.png) 0 0 0 0 stretch stretch;"
+                "}"
+            );
+        } else {
+            sidePanelButton->setStyleSheet(
+                "QPushButton {"
+                "border: none;"
+                "border-image: url(:/icons/sidebar_triggerred.png) 0 0 0 0 stretch stretch;"
+                "}"
+                "QPushButton:hover {"
+                "border-image: url(:/icons/sidebar_triggerred.png) 0 0 0 0 stretch stretch;"
+                "}"
+                "QPushButton:pressed {"
+                "border-image: url(:/icons/sidebar_triggerred.png) 0 0 0 0 stretch stretch;"
+                "}"
+            );
+        }
+    });
     
     setupUntitledTab(FICTION_TAB);
     setupActions();
@@ -453,6 +484,26 @@ void MainWindow::onLastTabClosed() {
 
 void MainWindow::toggleFileTreeView() {
     QList<int> sizes = centralSplitter->sizes(); // Get current splitter sizes
+    const int totalWidth = sizes.value(0) + sizes.value(1);
+    auto animateSidebarTo = [this, totalWidth](int startWidth, int endWidth) {
+        auto *animation = new QVariantAnimation(this);
+        animation->setDuration(180);
+        animation->setStartValue(startWidth);
+        animation->setEndValue(endWidth);
+        animation->setEasingCurve(QEasingCurve::InOutCubic);
+
+        sidePanelButton->setEnabled(false);
+        connect(animation, &QVariantAnimation::valueChanged, this,
+                [this, totalWidth](const QVariant &value) {
+                    const int sidebarWidth = value.toInt();
+                    centralSplitter->setSizes(
+                        {sidebarWidth, qMax(0, totalWidth - sidebarWidth)});
+                });
+        connect(animation, &QVariantAnimation::finished, this, [this]() {
+            sidePanelButton->setEnabled(true);
+        });
+        animation->start(QAbstractAnimation::DeleteWhenStopped);
+    };
     
     // Only calculate the previousSplitterPosition if sizes[0] is non-zero (i.e., left widget is visible)
     if (sizes[0] != 0) {
@@ -461,7 +512,7 @@ void MainWindow::toggleFileTreeView() {
 
         // Hide the left widget and adjust the splitter size
         // folderTreeView->toggleFileTreeView();
-        centralSplitter->setSizes(QList<int>({0, centralSplitter->size().width()})); // Right widget takes over
+        animateSidebarTo(sizes[0], 0);
         sidePanelButton->setStyleSheet(
             "QPushButton {"
             "border: none;"
@@ -479,9 +530,7 @@ void MainWindow::toggleFileTreeView() {
             previousSplitterPosition = 0.166;
         }
         // Restore sizes based on the stored previousSplitterPosition
-        centralSplitter->setSizes(
-            QList<int>({static_cast<int>(centralSplitter->size().width() * previousSplitterPosition), 
-                        static_cast<int>(centralSplitter->size().width() * (1 - previousSplitterPosition))}));
+        animateSidebarTo(0, static_cast<int>(totalWidth * previousSplitterPosition));
 
         // Reset previousSplitterPosition after restoring
         previousSplitterPosition = 0.0;
@@ -527,6 +576,16 @@ void MainWindow::closeWindow() {
 
 bool MainWindow::eventFilter(QObject *obj, QEvent *event)
 {
+#ifdef Q_OS_LINUX
+    if (event->type() == QEvent::MouseMove) {
+        auto *mouseEvent = static_cast<QMouseEvent *>(event);
+        if (!(mouseEvent->buttons() & Qt::LeftButton)) {
+            const QPoint windowPos = mapFromGlobal(mouseEvent->globalPosition().toPoint());
+            updateCursor(rect().contains(windowPos) ? edgeAt(windowPos) : Qt::Edges());
+        }
+    }
+#endif
+
     // Check if the event is for one of our menu bar buttons
     if (obj == button1 || obj == button2)
     {
@@ -1327,7 +1386,6 @@ needed for resizing window in linux
                 |
 */
 Qt::Edges MainWindow::edgeAt(const QPoint &pos) const {
-    qDebug() << "MainWindow::edgeAt";
     Qt::Edges edges;
     QRect r = rect();
     if (pos.x() <= RESIZE_MARGIN) {
@@ -1343,21 +1401,26 @@ Qt::Edges MainWindow::edgeAt(const QPoint &pos) const {
 }
 
 void MainWindow::updateCursor(const Qt::Edges &edges) {
-    qDebug() << "MainWindow::updateCursor";
-    // Get the widget under the cursor
-    QWidget* widgetUnderCursor = QApplication::widgetAt(QCursor::pos());
-    
-    // Only show resize cursors if we have valid edges and window handle
-    if (edges != Qt::Edges() && windowHandle()) {
-        // Only change cursor if we're directly over the splitterContainer
-        if (widgetUnderCursor == splitterContainer) {
-            if (edges == (Qt::LeftEdge) || edges == (Qt::RightEdge)) {
-                splitterContainer->setCursor(Qt::SizeHorCursor);
-            } else if (edges == (Qt::BottomEdge)) {
-                splitterContainer->setCursor(Qt::SizeVerCursor);
-            }
+    Qt::CursorShape cursorShape = Qt::ArrowCursor;
+
+    if (windowHandle() && !isFullScreen()) {
+        const bool left = edges.testFlag(Qt::LeftEdge);
+        const bool right = edges.testFlag(Qt::RightEdge);
+        const bool bottom = edges.testFlag(Qt::BottomEdge);
+
+        if (left && bottom) {
+            cursorShape = Qt::SizeFDiagCursor;
+        } else if (right && bottom) {
+            cursorShape = Qt::SizeBDiagCursor;
+        } else if (left || right) {
+            cursorShape = Qt::SizeHorCursor;
+        } else if (bottom) {
+            cursorShape = Qt::SizeVerCursor;
         }
     }
+
+    setCursor(cursorShape);
+    splitterContainer->setCursor(cursorShape);
 }
 
 void MainWindow::mousePressEvent(QMouseEvent *event) {
